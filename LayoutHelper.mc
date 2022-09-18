@@ -215,7 +215,7 @@ module MyModule{
 				var x1 = Math.ceil(xMinC + radius).toNumber();
 				var x2 = Math.floor(xMaxC + radius).toNumber();
 				var y1 = Math.ceil(radius - yMaxC).toNumber();
-				var y2 = Math.ceil(radius - yMinC).toNumber();
+				var y2 = Math.floor(radius - yMinC).toNumber();
 				return [
 					x1, // x
 					y1, // y
