@@ -37,12 +37,12 @@ module MyModule{
 			return (value < 0) ? -value : value;
 		}
 
-		function ceil2(value as Lang.Numeric, decimals as Lang.Number) as Lang.Numeric{
+		function ceil(value as Lang.Numeric, decimals as Lang.Number) as Lang.Numeric{
 			var factor = Math.pow(10, decimals).toNumber();
 			return Math.ceil(value * factor) / factor;
 		}
 		
-		function floor2(value as Lang.Numeric, decimals as Lang.Number) as Lang.Numeric{
+		function floor(value as Lang.Numeric, decimals as Lang.Number) as Lang.Numeric{
 			var factor = Math.pow(10, decimals).toNumber();
 			return Math.floor(value * factor) / factor;
 		}
