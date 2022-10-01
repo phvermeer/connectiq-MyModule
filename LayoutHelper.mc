@@ -200,14 +200,14 @@ module MyModule{
 					var h = yMax - yMin;
 					if(ratio * h > w){
 						// trim height to get the correct ratio
-						var ∆y = (h - (w / ratio))/2;
-						yMinC += ∆y;
-						yMaxC -= ∆y;
+						var dy = (h - (w / ratio))/2;
+						yMinC += dy;
+						yMaxC -= dy;
 					}else{
 						// trim width to get the correct ratio
-						var ∆x = (w - (h * ratio))/2;
-						xMinC += ∆x;
-						xMaxC -= ∆x;
+						var dx = (w - (h * ratio))/2;
+						xMinC += dx;
+						xMaxC -= dx;
 					}
 					ok = true;
 				}
