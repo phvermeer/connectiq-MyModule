@@ -15,12 +15,17 @@ module MyModule{
 				VALIGN_BOTTOM = 0x20,
 			}
 
-			protected var series as Array<Graph.Serie>;
-			protected var align as Alignment = HALIGN_LEFT | VALIGN_CENTER;
-			protected var textColor as ColorValue = Graphics.COLOR_BLACK;
-			protected var xRangeMin as Float = 20.0f;
-			protected var xCurrent as Float or Null;
-			protected var yCurrent as Float or Null;
+			hidden var series as Array<Graph.Serie>;
+			hidden var align as Alignment = HALIGN_LEFT | VALIGN_CENTER;
+			hidden var xRangeMin as Float = 20.0f;
+			hidden var xCurrent as Float or Null;
+			hidden var yCurrent as Float or Null;
+
+			hidden var frameColor as Graphics.ColorValue = Graphics.COLOR_BLACK;
+			hidden var textColor as Graphics.ColorValue = Graphics.COLOR_BLACK;
+			hidden var xyMarkerColor as Graphics.ColorValue = Graphics.COLOR_BLACK;
+			hidden var maxMarkerColor as Graphics.ColorValue = Graphics.COLOR_RED;
+			hidden var minMarkerColor as Graphics.ColorValue = Graphics.COLOR_GREEN;
 
 			function initialize(settings as {
 				:locX as Number, 
@@ -57,7 +62,7 @@ module MyModule{
 
 				// draw the xy-axis frame
 				dc.setPenWidth(axisWidth);
-				dc.setColor(textColor, Graphics.COLOR_TRANSPARENT);
+				dc.setColor(frameColor, Graphics.COLOR_TRANSPARENT);
 				dc.drawLine(locX, locY+topMargin, locX, locY+height-bottomMargin);
 				dc.drawLine(locX, locY+height-bottomMargin, locX+width, locY+height-bottomMargin);
 				dc.drawLine(locX+width, locY+topMargin, locX+width, locY+height-bottomMargin);
@@ -143,13 +148,13 @@ module MyModule{
 							// Min value
 							if(serie.markers & MARKER_MIN == MARKER_MIN){
 								var ptMin = serie.data.ptMin;
-								dc.setColor(Graphics.COLOR_RED, Graphics.COLOR_TRANSPARENT);
+								dc.setColor(minMarkerColor, Graphics.COLOR_TRANSPARENT);
 								drawMarker(dc, xOffset + xFactor * ptMin[0], yOffset + yFactor * ptMin[1], axisMargin, ptMin[1].format("%d"));
 							}
 							// Max value
 							if(serie.markers & MARKER_MAX == MARKER_MAX){
 								var ptMax = serie.data.ptMax;
-								dc.setColor(Graphics.COLOR_GREEN, Graphics.COLOR_TRANSPARENT);
+								dc.setColor(maxMarkerColor, Graphics.COLOR_TRANSPARENT);
 								drawMarker(dc, xOffset + xFactor * ptMax[0], yOffset + yFactor * ptMax[1], axisMargin, ptMax[1].format("%d"));
 							}
 						}
@@ -158,13 +163,13 @@ module MyModule{
 				// draw current x and y markers
 				if(xCurrent != null){
 					var x = xOffset + xFactor * xCurrent;
-					dc.setColor(Graphics.COLOR_PINK, Graphics.COLOR_TRANSPARENT);
+					dc.setColor(xyMarkerColor, Graphics.COLOR_TRANSPARENT);
 					dc.setPenWidth(1);
 					dc.drawLine(x, locY, x, locY + height);
 				}
 				if(yCurrent != null){
 					var y = yOffset + yFactor * yCurrent;
-					dc.setColor(Graphics.COLOR_PINK, Graphics.COLOR_TRANSPARENT);
+					dc.setColor(xyMarkerColor, Graphics.COLOR_TRANSPARENT);
 					dc.setPenWidth(1);
 					dc.drawLine(xOffset, y, xOffset + xMax * xFactor, y);
 				}
@@ -197,6 +202,10 @@ module MyModule{
 
 			public function setDarkMode(darkMode as Lang.Boolean){
 				self.textColor = darkMode ? Graphics.COLOR_WHITE : Graphics.COLOR_BLACK;
+				self.frameColor = darkMode ? Graphics.COLOR_LT_GRAY : Graphics.COLOR_DK_GRAY;
+				self.xyMarkerColor = darkMode ? Graphics.COLOR_WHITE : Graphics.COLOR_BLACK;
+				self.minMarkerColor = darkMode ? Graphics.COLOR_RED : Graphics.COLOR_DK_RED;
+				self.maxMarkerColor = darkMode ? Graphics.COLOR_GREEN : Graphics.COLOR_DK_GREEN;
 			}
 			public function getTextColor() as Graphics.ColorValue{
 				return textColor;
