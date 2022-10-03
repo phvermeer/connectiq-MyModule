@@ -227,29 +227,29 @@ module MyModule{
 			function getAlignedPosition(align as Aligment, width as Lang.Numeric, height as Lang.Numeric) as Array<Lang.Number> or Null {
 				// This function will calculate the position (x,y) of a given rectangle (width, height) within a circle aligned to a direction within the circle and given boundaries
 		
-		// check if the rectangle fits with boundaries, otherwise align without looking at circle shape
-		if(width > (xMax-xMin)){
-			var y = radius - (yMin + yMax)/2 - height/2;
-			if(align == ALIGN_LEFT){
-				var x = xMin + radius;
-				return [x, y];
-			}else if(align == ALIGN_RIGHT){
-				var x = xMax - width + radius;
-				return [x, y];
-			}		
-		}
-		if(height > (yMax-yMin)){
-			var x = (xMin + xMax)/2 + radius - width/2;
-			if(align == ALIGN_TOP){
-				var y = radius - yMax;
-				return [x, y];
-			}else if(align == ALIGN_BOTTOM){
-				var y = radius - (yMin + height);
-				return [x, y];
-			}		
+				// check if the rectangle fits with boundaries, otherwise align without looking at circle shape
+				if(width > (xMax-xMin)){
+					var y = radius - (yMin + yMax)/2 - height/2;
+					if(align == ALIGN_LEFT){
+						var x = xMin + radius;
+						return [x, y];
+					}else if(align == ALIGN_RIGHT){
+						var x = xMax - width + radius;
+						return [x, y];
+					}
+				}
+				if(height > (yMax-yMin)){
+					var x = (xMin + xMax)/2 + radius - width/2;
+					if(align == ALIGN_TOP){
+						var y = radius - yMax;
+						return [x, y];
+					}else if(align == ALIGN_BOTTOM){
+						var y = radius - (yMin + height);
+						return [x, y];
+					}
 				}
 		
-		// transpose the aligmnent direction to ALIGN_TOP
+				// transpose the aligmnent direction to ALIGN_TOP
 				var ok = false;
 				var gap = null;
 				var r² = radius*radius;
@@ -269,12 +269,12 @@ module MyModule{
 					xMin = me.yMin;
 					xMax = me.yMax;
 					yMax = -me.xMin;
-					size = width;
+					size = height;
 				}else if(align == ALIGN_RIGHT){
 					xMin = -me.yMax;
 					xMax = -me.yMin;
 					yMax = me.xMax;
-					size = width;
+					size = height;
 				}else{
 					xMin = null;
 					xMax = null;
@@ -331,7 +331,7 @@ module MyModule{
 					x = radius - yMaxC;
 					y = radius - xMaxC + gap/2;
 				}else if(align == ALIGN_RIGHT){
-					x = radius + yMaxC - height;
+					x = radius + yMaxC - width;
 					y = radius + xMinC + gap/2;
 				}else{
 					return null;
