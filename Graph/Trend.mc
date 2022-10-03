@@ -21,11 +21,11 @@ module MyModule{
 			hidden var xCurrent as Float or Null;
 			hidden var yCurrent as Float or Null;
 
-			hidden var frameColor as Graphics.ColorValue = Graphics.COLOR_BLACK;
-			hidden var textColor as Graphics.ColorValue = Graphics.COLOR_BLACK;
-			hidden var xyMarkerColor as Graphics.ColorValue = Graphics.COLOR_BLACK;
-			hidden var maxMarkerColor as Graphics.ColorValue = Graphics.COLOR_RED;
-			hidden var minMarkerColor as Graphics.ColorValue = Graphics.COLOR_GREEN;
+			public var frameColor as Graphics.ColorValue = Graphics.COLOR_BLACK;
+			public var textColor as Graphics.ColorValue = Graphics.COLOR_BLACK;
+			public var xyMarkerColor as Graphics.ColorValue = Graphics.COLOR_BLACK;
+			public var maxMarkerColor as Graphics.ColorValue = Graphics.COLOR_RED;
+			public var minMarkerColor as Graphics.ColorValue = Graphics.COLOR_GREEN;
 
 			function initialize(settings as {
 				:locX as Number, 
@@ -207,9 +207,7 @@ module MyModule{
 				self.minMarkerColor = darkMode ? Graphics.COLOR_RED : Graphics.COLOR_DK_RED;
 				self.maxMarkerColor = darkMode ? Graphics.COLOR_GREEN : Graphics.COLOR_DK_GREEN;
 			}
-			public function getTextColor() as Graphics.ColorValue{
-				return textColor;
-			}
+
 			public function setAlignment(align){
 				self.align = align;
 			}
