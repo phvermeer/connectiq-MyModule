@@ -15,11 +15,11 @@ module MyModule{
 				VALIGN_BOTTOM = 0x20,
 			}
 
-			hidden var series as Array<Graph.Serie>;
-			hidden var align as Alignment = HALIGN_LEFT | VALIGN_CENTER;
-			hidden var xRangeMin as Float = 20.0f;
-			hidden var xCurrent as Float or Null;
-			hidden var yCurrent as Float or Null;
+			hidden var series as Array<Graph.Serie> = [] as Array<Graph.Serie>;
+			hidden var align as Alignment or Number = HALIGN_LEFT | VALIGN_CENTER;
+			hidden var xRangeMin as Numeric = 20.0f;
+			hidden var xCurrent as Numeric or Null;
+			hidden var yCurrent as Numeric or Null;
 
 			public var frameColor as Graphics.ColorValue = Graphics.COLOR_BLACK;
 			public var textColor as Graphics.ColorValue = Graphics.COLOR_BLACK;
@@ -40,13 +40,13 @@ module MyModule{
 				if(!settings.hasKey(:identifier)){ settings.put(:identifier, "Graph"); }
 				Drawable.initialize(settings);
 
-				if(settings.hasKey(:align)){ setAlignment(settings.get(:align)); }
+				if(settings.hasKey(:align)){ setAlignment(settings.get(:align) as Number); }
 				if(settings.hasKey(:series)){ series = settings.get(:series); }
-				if(settings.hasKey(:darkMode)){ setDarkMode(settings.get(:darkMode)); }
-				if(settings.hasKey(:xRangeMin)){ xRangeMin = settings.get(:xRangeMin); }
+				if(settings.hasKey(:darkMode)){ setDarkMode(settings.get(:darkMode) as Boolean); }
+				if(settings.hasKey(:xRangeMin)){ xRangeMin = settings.get(:xRangeMin) as Numeric; }
 			}
 
-			function draw(dc){
+			function draw(dc as Dc){
 				// collect data
 				if(series == null){ return; }
 
@@ -68,16 +68,12 @@ module MyModule{
 				dc.drawLine(locX+width, locY+topMargin, locX+width, locY+height-bottomMargin);
 				
 				// determine the generic limits (xMin, xMax, yMin, yMax)
-				var xMin = null;
-				var xMax = null;
-				var yMin = null;
-				var yMax = null;
 				if(series.size() > 0){
 					var data = series[0].data;
-					xMin = data.xMin;
-					xMax = data.xMax;
-					yMin = data.yMin;
-					yMax = data.yMax;
+					var xMin = data.xMin;
+					var xMax = data.xMax;
+					var yMin = data.yMin;
+					var yMax = data.yMax;
 					for(var s=0; s<series.size(); s++){
 						data = series[s].data;
 						if(data.xMin < xMin) { xMin = data.xMin; }
@@ -87,104 +83,122 @@ module MyModule{
 					}
 					if(xMin >= xMax) { return; }
 					if(yMin >= yMax) { return; }
-				}
-				var xFactor = innerWidth / (xMax - xMin);
-				var yFactor = -1 * innerHeight / (yMax - yMin);
-				var xOffset = axisMargin + locX - xMin * xFactor;
-				var yOffset = locY + topMargin + innerHeight - yMin * yFactor;
 
-				for(var s=0; s<series.size(); s++){
-					var serie = series[s];
-					if(serie.data != null){
-						var pts = serie.data.pts;
-						if(pts.size() < 2){ return; }
+					var xFactor = innerWidth / (xMax - xMin);
+					var yFactor = -1 * innerHeight / (yMax - yMin);
+					var xOffset = axisMargin + locX - xMin * xFactor;
+					var yOffset = locY + topMargin + innerHeight - yMin * yFactor;
 
-						var ptFirst = pts[0];
-						var ptLast = pts[pts.size()-1];
-					
-						var yRangeMin = serie.yRangeMin; // minimal vertical range
+					for(var s=0; s<series.size(); s++){
+						var serie = series[s];
+						if(serie.data != null){
+							var pts = serie.data.pts;
+							if(pts.size() < 2){ return; }
 
-						if((pts.size() > 1) && (xMax > xMin)){
+							var ptFirst = pts[0];
+							var ptLast = pts[pts.size()-1];
+						
+							var yRangeMin = serie.yRangeMin; // minimal vertical range
 
-							if((xMax - xMin) < xRangeMin){
-								var xExtra = xRangeMin - (xMax - xMin);
-								xMax += 1.0 * xExtra;
-								xMin -= 0.0 * xExtra;
-							}
+							if((pts.size() > 1) && (xMax > xMin)){
 
-							if((yMax - yMin) < yRangeMin){
-								var yExtra = yRangeMin - (yMax - yMin);
-								yMax += 0.8 * yExtra;
-								yMin -= 0.2 * yExtra;
-							}
-
-							// Create an array of point with screen xy
-
-							dc.setColor(serie.color, Graphics.COLOR_TRANSPARENT);
-							if(serie.style == DRAW_STYLE_FILLED){
-								var screenPts = [[xOffset + xFactor * ptLast[0], locY + topMargin + innerHeight],[xOffset + xFactor * ptFirst[0], locY + topMargin + innerHeight]];
-								for(var i=0; i<pts.size(); i++){
-									var pt=pts[i];
-									var x = xOffset + xFactor * pt[0];
-									var y = yOffset + yFactor * pt[1];
-									screenPts.add([x, y]);
+								if((xMax - xMin) < xRangeMin){
+									var xExtra = xRangeMin - (xMax - xMin);
+									xMax += 1.0 * xExtra;
+									xMin -= 0.0 * xExtra;
 								}
-								dc.fillPolygon(screenPts);
-							}else if(serie.style == DRAW_STYLE_LINE){
-								var xPrev = null; 
-								var yPrev = null; 
-								for(var i=0; i<pts.size(); i++){
-									var pt=pts[i];
-									var x = xOffset + xFactor * pt[0];
-									var y = yOffset + yFactor * pt[1];
-									if(i>0){
-										dc.drawLine(xPrev, yPrev, x, y);
+
+								if((yMax - yMin) < yRangeMin){
+									var yExtra = yRangeMin - (yMax - yMin);
+									yMax += 0.8 * yExtra;
+									yMin -= 0.2 * yExtra;
+								}
+
+								// Create an array of point with screen xy
+								var color = (serie.color != null) ? serie.color as ColorValue : textColor;
+								dc.setColor(color, Graphics.COLOR_TRANSPARENT);
+								
+								if(serie.style == DRAW_STYLE_FILLED){
+									var screenPts = [
+										[xOffset + xFactor * ptLast[0], locY + topMargin + innerHeight] as Array<Numeric>,
+										[xOffset + xFactor * ptFirst[0], locY + topMargin + innerHeight] as Array<Numeric>
+									] as Array< Array< Numeric> >;
+									for(var i=0; i<pts.size(); i++){
+										var pt=pts[i];
+										var x = xOffset + xFactor * pt[0] as Numeric;
+										var y = yOffset + yFactor * pt[1] as Numeric;
+										screenPts.add([x, y] as Array<Numeric>);
 									}
-									xPrev = x;
-									yPrev = y;
+									dc.fillPolygon(screenPts);
+								}else if(serie.style == DRAW_STYLE_LINE){
+									var xPrev = 0;
+									var yPrev = 0; 
+									for(var i=0; i<pts.size(); i++){
+										var pt=pts[i];
+										var x = xOffset + xFactor * pt[0] as Numeric;
+										var y = yOffset + yFactor * pt[1] as Numeric;
+										if(i>0){
+											dc.drawLine(xPrev, yPrev, x, y);
+										}
+										xPrev = x;
+										yPrev = y;
+									}
 								}
-							}
 
-							// Min value
-							if(serie.markers & MARKER_MIN == MARKER_MIN){
-								var ptMin = serie.data.ptMin;
-								dc.setColor(minMarkerColor, Graphics.COLOR_TRANSPARENT);
-								drawMarker(dc, xOffset + xFactor * ptMin[0], yOffset + yFactor * ptMin[1], axisMargin, ptMin[1].format("%d"));
-							}
-							// Max value
-							if(serie.markers & MARKER_MAX == MARKER_MAX){
-								var ptMax = serie.data.ptMax;
-								dc.setColor(maxMarkerColor, Graphics.COLOR_TRANSPARENT);
-								drawMarker(dc, xOffset + xFactor * ptMax[0], yOffset + yFactor * ptMax[1], axisMargin, ptMax[1].format("%d"));
+								// Min value
+								if((serie.markers != null) && (serie.data.ptMin != null) && (MARKER_MIN == MARKER_MIN)){
+									var ptMin = serie.data.ptMin as Array<Numeric>;
+									dc.setColor(minMarkerColor, Graphics.COLOR_TRANSPARENT);
+
+									drawMarker(
+										dc, 
+										xOffset + xFactor * ptMin[0], 
+										yOffset + yFactor * ptMin[1], 
+										axisMargin, 
+										ptMin[1].format("%d")
+									);
+								}
+								// Max value
+								if((serie.markers != null) && (serie.data.ptMax != null) && (MARKER_MAX == MARKER_MAX)){
+									var ptMax = serie.data.ptMax as Array<Numeric>;
+									dc.setColor(maxMarkerColor, Graphics.COLOR_TRANSPARENT);
+									drawMarker(
+										dc, 
+										xOffset + xFactor * ptMax[0], 
+										yOffset + yFactor * ptMax[1], 
+										axisMargin, 
+										ptMax[1].format("%d")
+									);
+								}
 							}
 						}
 					}
-				}
-				// draw current x and y markers
-				if(xCurrent != null){
-					var x = xOffset + xFactor * xCurrent;
-					dc.setColor(xyMarkerColor, Graphics.COLOR_TRANSPARENT);
-					dc.setPenWidth(1);
-					dc.drawLine(x, locY, x, locY + height);
-				}
-				if(yCurrent != null){
-					var y = yOffset + yFactor * yCurrent;
-					dc.setColor(xyMarkerColor, Graphics.COLOR_TRANSPARENT);
-					dc.setPenWidth(1);
-					dc.drawLine(xOffset, y, xOffset + xMax * xFactor, y);
+					// draw current x and y markers
+					if(xCurrent != null){
+						var x = xOffset + xFactor * xCurrent;
+						dc.setColor(xyMarkerColor, Graphics.COLOR_TRANSPARENT);
+						dc.setPenWidth(1);
+						dc.drawLine(x, locY, x, locY + height);
+					}
+					if(yCurrent != null){
+						var y = yOffset + yFactor * yCurrent;
+						dc.setColor(xyMarkerColor, Graphics.COLOR_TRANSPARENT);
+						dc.setPenWidth(1);
+						dc.drawLine(xOffset, y, xOffset + xMax * xFactor, y);
+					}
 				}
 			}
 			
-			public function setCurrentX(x as Float or Null){
+			public function setCurrentX(x as Numeric or Null) as Void{
 				// This will draw the current X marker in the graph
-				me.xCurrent = x;			
+				self.xCurrent = x;			
 			}
-			public function setCurrentY(y as Float or Null){
+			public function setCurrentY(y as Numeric or Null) as Void{
 				// This will draw the current X marker in the graph
-				me.yCurrent = y;			
+				self.yCurrent = y;			
 			}
 			
-			protected function drawMarker(dc as Graphics.Dc, x, y, margin, text as Lang.String){
+			protected function drawMarker(dc as Graphics.Dc, x as Numeric, y as Numeric, margin as Numeric, text as String) as Void{
 				var font = Graphics.FONT_XTINY;
 				var w2 = dc.getTextWidthInPixels(text, font)/2;
 				var h = dc.getFontHeight(font);
@@ -194,13 +208,16 @@ module MyModule{
 				}else if((x+w2) > (locX + width - margin)){
 					xText = locX + width - margin - w2;
 				}
-
-				dc.fillPolygon([[x,y], [x-5, y-6], [x+5, y-6]]);
+				dc.fillPolygon([
+					[x, y] as Array<Numeric>,
+					[x-5, y-6] as Array<Numeric>,
+					[x+5, y-6] as Array<Numeric>
+				] as Array< Array<Numeric> >);
 				dc.setColor(textColor, Graphics.COLOR_TRANSPARENT);
 				dc.drawText(xText, y-6-h, font, text, Graphics.TEXT_JUSTIFY_CENTER);
 			}
 
-			public function setDarkMode(darkMode as Lang.Boolean){
+			public function setDarkMode(darkMode as Boolean) as Void{
 				self.textColor = darkMode ? Graphics.COLOR_WHITE : Graphics.COLOR_BLACK;
 				self.frameColor = darkMode ? Graphics.COLOR_LT_GRAY : Graphics.COLOR_DK_GRAY;
 				self.xyMarkerColor = darkMode ? Graphics.COLOR_WHITE : Graphics.COLOR_BLACK;
@@ -208,23 +225,14 @@ module MyModule{
 				self.maxMarkerColor = darkMode ? Graphics.COLOR_GREEN : Graphics.COLOR_DK_GREEN;
 			}
 
-			public function setAlignment(align){
+			public function setAlignment(align as Alignment or Number) as Void{
 				self.align = align;
 			}
-			public function addSerie(serie as Graph.Serie){
-				if(series == null){
-					series = [serie];
-				}else{
-					series.add(serie);
-				}
+			public function addSerie(serie as Graph.Serie) as Void{
+				series.add(serie);
 			}
-			public function removeSerie(serie as Graph.Serie){
-				if(series != null){
-					series.remove(serie);
-					if(series.size() == null){
-						series = null;
-					}
-				}
+			public function removeSerie(serie as Graph.Serie) as Void{
+				series.remove(serie);
 			}
 		}
 	}
