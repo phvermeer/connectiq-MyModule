@@ -50,7 +50,7 @@ module MyModule{
 				self.yMax = (self.radius - y).toFloat();
 			}
 
-			function getAreaByRatio(ratio as Float) as Array<Number>{
+			function getAreaByRatio(ratio as Float) as Array<Number> or Null{
 				// not ok untill ok is proven
 				var ok = false;
 				// placeholders  for final result
