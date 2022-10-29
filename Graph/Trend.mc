@@ -27,7 +27,7 @@ module MyModule{
 			public var maxMarkerColor as Graphics.ColorValue = Graphics.COLOR_RED;
 			public var minMarkerColor as Graphics.ColorValue = Graphics.COLOR_GREEN;
 
-			function initialize(settings as {
+			function initialize(options as {
 				:locX as Number, 
 				:locY as Number,
 				:width as Number, 
@@ -37,13 +37,13 @@ module MyModule{
 				:darkMode as Boolean,
 				:xRangeMin as Float,
 			}){
-				if(!settings.hasKey(:identifier)){ settings.put(:identifier, "Graph"); }
-				Drawable.initialize(settings);
+				if(!options.hasKey(:identifier)){ options.put(:identifier, "Graph"); }
+				Drawable.initialize(options);
 
-				if(settings.hasKey(:align)){ setAlignment(settings.get(:align) as Number); }
-				if(settings.hasKey(:series)){ series = settings.get(:series); }
-				if(settings.hasKey(:darkMode)){ setDarkMode(settings.get(:darkMode) as Boolean); }
-				if(settings.hasKey(:xRangeMin)){ xRangeMin = settings.get(:xRangeMin) as Numeric; }
+				if(options.hasKey(:align)){ setAlignment(options.get(:align) as Number); }
+				if(options.hasKey(:series)){ series = options.get(:series); }
+				if(options.hasKey(:darkMode)){ setDarkMode(options.get(:darkMode) as Boolean); }
+				if(options.hasKey(:xRangeMin)){ xRangeMin = options.get(:xRangeMin) as Numeric; }
 			}
 
 			function draw(dc as Dc){
