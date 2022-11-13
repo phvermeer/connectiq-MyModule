@@ -143,13 +143,24 @@ module MyModule{
 				return array;
 			}
 
-			function filter(newSize as Number) as Void{
-				System.println(Lang.format("before filter: $1$", [getRankValues()]));
-				while(_lowestRanked != null && size() > newSize){
+			function filterSize(maxSize as Number) as Void{
+				// System.println(Lang.format("before filter: $1$", [getRankValues()]));
+				while(_lowestRanked != null && size() > maxSize){
 					// remove the item with the lowest rank untill the size is within the range
 					deleteItem(_lowestRanked);
 				}
-				System.println(Lang.format("after filter: $1$", [getRankValues()]));
+				// System.println(Lang.format("after filter: $1$", [getRankValues()]));
+			}
+
+			public function filterRanking(minRankValue as Float) as Void{
+				while(_lowestRanked != null){
+					if(_lowestRanked.rankValue as Float < minRankValue){
+						// remove the item with the lowest rank as long as this rank is lower than the minRanking
+						deleteItem(_lowestRanked);
+					}else{
+						break;
+					}
+				}
 			}
 		}
 	}
