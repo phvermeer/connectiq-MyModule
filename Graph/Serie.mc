@@ -16,7 +16,7 @@ module MyModule{
 
 		class Serie{
 
-			var color as Graphics.ColorValue or Null = null; // if null then let the graph decide (based upon background)
+			var color as Graphics.ColorType or Null = null; // if null then let the graph decide (based upon background)
 			var data as Graph.Data;
 			var style as DrawStyle = DRAW_STYLE_FILLED;
 			var markers as MarkerType or Number = MARKER_MIN | MARKER_MAX;
@@ -24,7 +24,7 @@ module MyModule{
 
 			function initialize(options as {
 				:data as Graph.Data,  // required
-				:color as Graphics.ColorValue, // optional
+				:color as Graphics.ColorType, // optional
 				:style as DrawStyle, //optional
 				:markers as MarkerType,
 				:yRangeMin as Numeric,

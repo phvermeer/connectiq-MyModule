@@ -21,11 +21,11 @@ module MyModule{
 			hidden var xCurrent as Numeric or Null;
 			hidden var yCurrent as Numeric or Null;
 
-			public var frameColor as Graphics.ColorValue = Graphics.COLOR_BLACK;
-			public var textColor as Graphics.ColorValue = Graphics.COLOR_BLACK;
-			public var xyMarkerColor as Graphics.ColorValue = Graphics.COLOR_BLACK;
-			public var maxMarkerColor as Graphics.ColorValue = Graphics.COLOR_RED;
-			public var minMarkerColor as Graphics.ColorValue = Graphics.COLOR_GREEN;
+			public var frameColor as Graphics.ColorType = Graphics.COLOR_BLACK;
+			public var textColor as Graphics.ColorType = Graphics.COLOR_BLACK;
+			public var xyMarkerColor as Graphics.ColorType = Graphics.COLOR_BLACK;
+			public var maxMarkerColor as Graphics.ColorType = Graphics.COLOR_RED;
+			public var minMarkerColor as Graphics.ColorType = Graphics.COLOR_GREEN;
 
 			function initialize(options as {
 				:locX as Number, 
@@ -115,7 +115,7 @@ module MyModule{
 								}
 
 								// Create an array of point with screen xy
-								var color = (serie.color != null) ? serie.color as ColorValue : textColor;
+								var color = (serie.color != null) ? serie.color as ColorType : textColor;
 								dc.setColor(color, Graphics.COLOR_TRANSPARENT);
 								
 								if(serie.style == DRAW_STYLE_FILLED){
