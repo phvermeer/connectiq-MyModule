@@ -148,6 +148,7 @@ module MyModule{
 					}
 		
 					if(!ok){
+						ok = true;
 						// Now check if the rectangle is limited at a single corner
 						if(q1){
 							//	q1 =>
@@ -185,6 +186,8 @@ module MyModule{
 							yMaxC = yMax;
 							xMinC = xMin;
 							xMaxC = results.get(:xMax) as Float;
+						}else{
+							ok = false;
 						}
 					}
 				}
@@ -446,27 +449,32 @@ module MyModule{
 				//       						         <--|---->
 				//	                     xOffset| xMax  (from horizontal center)
 				//
-				//	radius² = xMax² + yMax²
-				//	ratio = (xMax + xOffset) / (yMax + yOffset)
-				//	=>	ratio * (yMax + yOffset) = (xMax + xOffset)
-				//	=>	xMax = ratio * (yMax + yOffset) - xOffset 
+				//	xOffset -> x
+				//	yOffset -> y
+				//	radius -> r
+				//	ratio -> C
 				//
-				//	radius² = (ratio * (yMax + yOffset) - xOffset)² + yMax²
-				//	=> (ratio * (yMax + yOffset) - xOffset)² + yMax² - radius² = 0
-				//	=> (ratio * yMax + ratio * yOffset - xOffset)² + yMax² - radius² = 0
-		
-				//	=> (ratio * yMax)² + 2 * (ratio * yMax) * (ratio * yOffset - xOffset) + (ratio * yOffset - xOffset)² + yMax² - radius² = 0
-				//	=> (ratio² + 1) * yMax²	+ (2 * ratio * (ratio * yOffset - xOffset))	* yMax + (ratio * yOffset - xOffset)² - radius² = 0
-		
-				//	a = (ratio² + 1)
-				//	b = (2 * ratio * (ratio * yOffset - xOffset))
-				//	c = (ratio * yOffset - xOffset)² - radius²
-				var a = ratio*ratio + 1;
-				var b = 2 * ratio * (ratio * yOffset - xOffset);
-				var c = Math.pow(ratio * yOffset - xOffset, 2) - radius*radius;
+				//	(x+w)²+(y+h)²=r²
+				//	h=w/C	→	(x+w)²+(y+w/C)²=r²	
+				//	(x²+2wx+w²) + (y²+(2y/C)w+(1/C²)w²) = r²
+				//	(1+1/C²)*w² + (2x+2y/C)*w + (x²+y²-r²) = 0
+				//
+				//	w? -> use abc formula where w->x
+				//
+				//	ax² + bx + c = 0
+				//
+				//	a = (1+1/C²)
+				//	b = (2x+2y/C)
+				//	c = (x²+y²-r²)
+
+				var a = 1 + 1/(ratio*ratio);
+				var b = 2 * xOffset + 2 * yOffset / ratio;
+				var c = xOffset * xOffset + yOffset * yOffset - radius * radius;
 				var results = MyMath.getAbcFormulaResults(a, b, c);
-				var yMax = results[1];
-				var xMax = ratio * (yMax + yOffset) - xOffset;
+				var w = MyMath.max(results); // use the positive result
+				var h = w / ratio;
+				var yMax = yOffset + h;
+				var xMax = xOffset + w;
 				return {
 					:xMax => xMax,
 					:yMax => yMax,
