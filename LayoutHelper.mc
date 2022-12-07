@@ -189,6 +189,13 @@ module MyModule{
 						}else{
 							ok = false;
 						}
+						// Check if the calculated circle edge values are within the given limits
+						if(ok){
+							if(yMaxC as Float > yMax) { ok = false; q1 = false; q2 = false;}
+							if(yMinC as Float < yMin) { ok = false; q3 = false; q4 = false;}
+							if(xMaxC as Float > xMax) { ok = false; q1 = false; q4 = false;}
+							if(xMinC as Float < xMin) { ok = false; q2 = false; q3 = false;}
+						}
 					}
 				}
 					
@@ -218,11 +225,17 @@ module MyModule{
 				var x2 = Math.floor((xMaxC as Float) + radius).toNumber();
 				var y1 = Math.ceil(radius - (yMaxC as Float)).toNumber();
 				var y2 = Math.floor(radius - (yMinC as Float)).toNumber();
+				var w = x2 - x1;
+				var h = y2 - y1;
+				if(w<0 || h<0){
+					return null;
+				}
+
 				return [
 					x1, // x
 					y1, // y
-					x2-x1, // width
-					y2-y1, // height
+					w, // width
+					h, // height
 				] as Array<Number>;
 			}
 
