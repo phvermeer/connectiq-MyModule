@@ -156,9 +156,9 @@ module MyModule{
 			
 							// determine the x,y for this quadrant
 							yMaxC = results.get(:yMax) as Float;
-							yMinC = yMin;
 							xMaxC = results.get(:xMax) as Float;
 							xMinC = xMin;
+							yMinC = yMin;
 						}else if(q2){
 							//	q2 =>
 							var results = getLimitsForRatio_1Corner(ratio as Float, -xMax as Float, yMin as Float, radius as Float);
@@ -191,35 +191,50 @@ module MyModule{
 						}
 						// Check if the calculated circle edge values are within the given limits
 						if(ok){
-							if(yMaxC as Float > yMax) { ok = false; q1 = false; q2 = false;}
-							if(yMinC as Float < yMin) { ok = false; q3 = false; q4 = false;}
-							if(xMaxC as Float > xMax) { ok = false; q1 = false; q4 = false;}
-							if(xMinC as Float < xMin) { ok = false; q2 = false; q3 = false;}
+							if(yMaxC as Float > yMax) {
+								yMaxC = yMax;
+								if(q1){
+									xMaxC = Math.sqrt(radius*radius - yMax*yMax);
+								}else if(q2){
+									xMinC = - Math.sqrt(radius*radius - yMax*yMax);
+								}
+							}
+							if(yMinC as Float < yMin) {
+								yMinC = yMin;
+								if(q4){
+									xMaxC = Math.sqrt(radius*radius - yMin*yMin);
+								}else if(q3){
+									xMinC = - Math.sqrt(radius*radius - yMin*yMin);
+								}
+							}
+							if(xMaxC as Float > xMax) {
+								xMaxC = xMax;
+								if(q1){
+									yMaxC = Math.sqrt(radius*radius - xMax*xMax);
+								}else if(q4){
+									yMinC = - Math.sqrt(radius*radius - xMax*xMax);
+								}
+							}
+							if(xMinC as Float < xMin) {
+								xMinC = xMin;
+								if(q2){
+									yMaxC = Math.sqrt(radius*radius - xMin*xMin);
+								}else if(q3){
+									yMinC = - Math.sqrt(radius*radius - xMin*xMin);
+								}
+							}
 						}
 					}
 				}
-					
+
 				if(!ok){
 					xMinC = xMin;
 					xMaxC = xMax;
 					yMinC = yMin;
 					yMaxC = yMax;
-		
-					var w = xMax - xMin;
-					var h = yMax - yMin;
-					if(ratio * h > w){
-						// trim height to get the correct ratio
-						var dy = (h - (w / ratio))/2;
-						yMinC += dy;
-						yMaxC -= dy;
-					}else{
-						// trim width to get the correct ratio
-						var dx = (w - (h * ratio))/2;
-						xMinC += dx;
-						xMaxC -= dx;
-					}
 					ok = true;
 				}
+
 				// convert to real xy coordinates:
 				var x1 = Math.ceil((xMinC as Float) + radius).toNumber();
 				var x2 = Math.floor((xMaxC as Float) + radius).toNumber();
@@ -227,8 +242,17 @@ module MyModule{
 				var y2 = Math.floor(radius - (yMinC as Float)).toNumber();
 				var w = x2 - x1;
 				var h = y2 - y1;
+
 				if(w<0 || h<0){
 					return null;
+				}else if(ratio * h > w){
+					var dh = (h - (w / ratio));
+					h -= dh;
+					y1 += dh/2;
+				}else if(ratio * h < w){
+					var dw = (w - (h * ratio));
+					w -= dw;
+					x1 += dw/2;
 				}
 
 				return [
