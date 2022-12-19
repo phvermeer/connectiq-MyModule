@@ -50,6 +50,15 @@ module MyModule{
 				self.yMax = (self.radius - y).toFloat();
 			}
 
+			function getBoundaries() as Array<Numeric>{
+				return [
+					xMin + radius, // x
+					yMin + radius, // y
+					xMax - xMin, // width
+					yMax - yMin, // height
+				] as Array<Numeric>;
+			}
+
 			function getAreaByRatio(ratio as Float) as Array<Number> or Null{
 				// not ok untill ok is proven
 				var ok = false;
@@ -100,21 +109,36 @@ module MyModule{
 							var result = getLimitsForRatio_2Corners(ratio, yMin, radius);
 			
 							// determine the x,y based upon these results for given quadrants
-							xMaxC = result.get(:range) as Float;
-							xMinC = -xMaxC;
 							yMaxC = result.get(:max) as Float;
 							yMinC = yMin;
-			
+
+							// Check max limit
+							if(yMaxC > yMax){
+								yMaxC = yMax;
+								xMaxC = Math.sqrt(radius*radius - yMax*yMax);
+							}else{
+								xMaxC = result.get(:range) as Float;
+							}
+							xMinC = -xMaxC;
+
 						}else if(q3 && q4){
 							// determine the bigest rectangle with given ratio within a circle (top)
 							var result = getLimitsForRatio_2Corners(ratio, -yMax, radius);
 			
 							// determine the x,y based upon these results for given quadrants
-							xMaxC = result.get(:range) as Float;
-							xMinC = -xMaxC;
-							yMaxC = yMax;
 							yMinC = -(result.get(:max) as Float);
-			
+							yMaxC = yMax;
+
+							// Check max limit
+							if(yMinC < yMin){
+								yMinC = yMin;
+								xMaxC = Math.sqrt(radius*radius - yMin*yMin);
+							}else{
+								xMaxC = result.get(:range) as Float;
+							}
+							xMinC = -xMaxC;
+
+
 						}else if(q1 && q4){
 							// determine the bigest rectangle with given ratio within a circle (top)
 							var result = getLimitsForRatio_2Corners(1/ratio, xMin, radius);
@@ -122,18 +146,32 @@ module MyModule{
 							// determine the x,y based upon these results for given quadrants
 							xMaxC = result.get(:max) as Float;
 							xMinC = xMin;
-							yMaxC = result.get(:range) as Float;
+
+							// Check max limit
+							if(xMaxC > xMax){
+								xMaxC = xMax;
+								yMaxC = Math.sqrt(radius*radius - xMax*yMax);
+							}else{
+								yMaxC = result.get(:range) as Float;
+							}
 							yMinC = -yMaxC;
-			
+
 						}else if(q2 && q3){
 							// determine the bigest rectangle with given ratio within a circle (top)
 							var result = getLimitsForRatio_2Corners(1/ratio, -xMax, radius);
 			
 							// determine the x,y based upon these results for given quadrants
-							xMaxC = xMax;
 							xMinC = -(result.get(:max) as Float);
-							yMaxC = result.get(:range) as Float;
+							xMaxC = xMax;
+
+							if(xMinC < xMin){
+								xMinC = xMin;
+								yMaxC = Math.sqrt(radius*radius - xMin*xMin);
+							}else{
+								yMaxC = result.get(:range) as Float;
+							}
 							yMinC = -yMaxC;
+
 						}else{
 							ok = false;
 						}
@@ -245,7 +283,7 @@ module MyModule{
 
 				if(w<0 || h<0){
 					return null;
-				}else if(ratio * h > w){
+/*				}else if(ratio * h > w){
 					var dh = (h - (w / ratio));
 					h -= dh;
 					y1 += dh/2;
@@ -253,7 +291,7 @@ module MyModule{
 					var dw = (w - (h * ratio));
 					w -= dw;
 					x1 += dw/2;
-				}
+*/				}
 
 				return [
 					x1, // x
