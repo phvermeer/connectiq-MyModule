@@ -8,6 +8,420 @@ module MyModule{
 
 	(:Layout)
 	module Layout {
+
+		enum AlignDirection {
+			ALIGN_LEFT = 1,
+			ALIGN_RIGHT = 2,
+			ALIGN_TOP = 4,
+			ALIGN_BOTTOM = 8
+		}
+
+		enum Quadrant {
+			QUADRANT_TOP_RIGHT = 1,
+			QUADRANT_TOP_LEFT = 2,
+			QUADRANT_BOTTOM_LEFT = 4,
+			QUADRANT_BOTTOM_RIGHT = 8,
+			QUADRANTS_ALL = 15
+		}
+
+		class Area{
+			// The area uses x and y with 4 quadrant orientation
+			// xyCenter = (0,0)
+			// xyTopLeft = (screenHeight/2, -screenWidth/2)
+			// xyBottomRight = (-screenHeight/2, screenWidth/2)
+			var xOffset as Number;
+			var yOffset as Number;
+			var xMin as Numeric;
+			var xMax as Numeric;
+			var yMin as Numeric;
+			var yMax as Numeric;
+
+			function initialize(locX as Numeric, locY as Numeric, width as Numeric, height as Numeric) {
+				// Transposes screen orientation to 4 quadrant orientation
+				// 	screen: xy(0,0) => topleft
+				//	4 quadrant: xy(0,0) => center
+				var deviceSettings = System.getDeviceSettings();
+				xOffset = deviceSettings.screenWidth / 2;
+				yOffset = deviceSettings.screenHeight / 2;
+
+				xMin = locX - xOffset;
+				xMax = (locX + width) - xOffset;
+				yMax = yOffset - locY;
+				yMin = yOffset - (locY + height);
+			}
+			static function create(xMin as Numeric, yMin as Numeric, xMax as Numeric, yMax as Numeric) as Area{
+				var area = new Area(0,0,0,0);
+				area.xMin = xMin;
+				area.yMin = yMin;
+				area.xMax = xMax;
+				area.yMax = yMax;
+				return area;
+			}
+
+			function clone() as Area{ return Area.create(xMin, yMin, xMax, yMax); }
+			function getLocX() as Numeric{ return xMin + xOffset; }
+			function getLocY() as Numeric { return yOffset - yMax; }
+			function getWidth() as Numeric{ return xMax - xMin; }
+			function getHeight() as Numeric{ return yMax - yMin; }
+			function rotateToNextQuadrant() as Void{
+				var xMin = self.xMin;
+				self.xMin = -yMax;
+				self.yMax = xMax;
+				self.xMax = -yMin;
+				self.yMin = xMin;
+			}
+			function rotateToPreviousQuadrant() as Void{
+				var xMin = self.xMin;
+				self.xMin = yMin;
+				self.yMin = -xMax;
+				self.xMax = yMax;
+				self.yMax = -xMin;
+			}
+			function flipHorizontal() as Void{
+				var xMin = self.xMin;
+				self.xMin = -xMax;
+				self.xMax = -xMin;
+			}
+			function flipVertical() as Void{
+				var yMin = self.yMin;
+				self.yMin = -yMax;
+				self.yMax = -yMin;
+			}
+			function toString() as String{
+//				return Lang.format("(x, y) = ($1$, $2$), (width, height) = ($3$, $4$)", [getLocX(), getLocY(), getWidth(), getHeight()]);
+				return Lang.format("xyMin = ($1$, $2$), xyMax = ($3$, $4$)", [xMin, yMin, xMax, yMax]);
+			}
+		}
+
+		class SimpleLayoutHelper{
+			// Simple helper not taking account of round edges
+
+			function getAreaWithRatio(boundaries as Area, ratio as Float) as Area{
+				// returnes an area with given ratio (=width/height) within given boundaries
+				var w = boundaries.getWidth();
+				var h = boundaries.getHeight();
+				var r = w/h;
+
+				if(r > ratio){
+					// shrink width
+					var width = h * ratio;
+					var dx = 0.5f * (w - width);
+					System.println("dx = " + dx);
+					return Area.create(boundaries.xMin + dx, boundaries.yMin, boundaries.xMax - dx, boundaries.yMax);
+				}else if(r < ratio){
+					// shrink height
+					var height = w / ratio;
+					var dy = 0.5f * (h - height);
+					System.println("dy = " + dy);
+					return Area.create(boundaries.xMin, boundaries.yMin + dy, boundaries.xMax, boundaries.yMax - dy);
+				}else{
+					// already has requested ratio
+					return boundaries.clone();
+				}
+			}
+
+			function setAreaAligned(boundaries as Area, area as Area, alignment as AlignDirection|Number) as Void{
+				var left = (alignment & ALIGN_LEFT) > 0;
+				var right = (alignment & ALIGN_RIGHT) > 0;
+				var top = (alignment & ALIGN_TOP) > 0;
+				var bottom = (alignment & ALIGN_BOTTOM) > 0;
+
+				// horizontal alignment
+				var dx = (left && !right) ? boundaries.xMin - area.xMin // align left
+					: (right && !left) ? area.xMax - boundaries.xMax  // align right
+					: ((area.xMin + area.xMax) - (boundaries.xMin + boundaries.xMax))/2; // align centered
+
+				area.xMin += dx;
+				area.xMax += dx;
+
+				// vertical alignment
+				var dy = (top && !bottom) ? boundaries.yMin - area.yMin	// align top
+					: (bottom && !top) ? area.yMax - boundaries.yMax	// align bottom
+					: ((area.yMin + area.yMax) - (boundaries.yMin + boundaries.yMax))/2; // align middle
+
+				area.yMin += dy;
+				area.yMax += dy;
+			}		
+		}
+
+		class RoundScreenLayoutHelper extends SimpleLayoutHelper{
+			var radius as Number;
+
+			function initialize(radius as Number){
+				self.radius = radius;
+				SimpleLayoutHelper.initialize();
+			}
+
+			function setAreaAligned(boundaries as Area, area as Area, alignment as AlignDirection|Number) as Void{
+				SimpleLayoutHelper.setAreaAligned(boundaries, area, alignment);
+			}
+
+			function getAreaWithRatio(boundaries as Area, ratio as Float) as Area {
+				// check in which quadrants the space (=boundaries) is in
+				var quadrants = 0;
+				if(boundaries.yMax > 0){
+					if(boundaries.xMax > 0){
+						quadrants |= QUADRANT_TOP_RIGHT;
+					}
+					if(boundaries.xMin < 0){
+						quadrants |= QUADRANT_TOP_LEFT;
+					}
+				}
+				if(boundaries.yMin < 0){
+					if(boundaries.xMax > 0){
+						quadrants |= QUADRANT_BOTTOM_RIGHT;
+					}
+					if(boundaries.xMin < 0){
+						quadrants |= QUADRANT_BOTTOM_LEFT;
+					}
+				}
+
+				// check if the circle edge can be reached with all 4 corners
+				if(quadrants == QUADRANT_TOP_RIGHT | QUADRANT_TOP_LEFT | QUADRANT_BOTTOM_RIGHT | QUADRANT_BOTTOM_LEFT){
+					System.println("4 corners");
+
+					// this functions returns 2 Float values: xMax, yMax which indicate the top left corner of the found rectangle with given ratio
+					//         radius   ↑      ┌─────────┐
+					//	(from center)   ·    ┌─○· · · · ·○─┐   ↑ yMax (from vertical center)
+					//	                ·  ┌─┘ ·         · └─┐ · 
+					//	                ·  │   ·         ·   │ ·
+					//	                ─  │   ·    +    ·   │ ─
+					//	                   │   ·         ·   │ 
+					//	                   └─┐ ·         · ┌─┘
+					//	                     └─○· · · · ·○─┘
+					//	                       └─────────┘
+					//                         <----|---->
+					//	                      -xMax | xMax  (from horizontal center)
+			
+					//	formula1:	radius² = x² + y²
+					//		=> radius² = xMax² + yMax²
+					//
+					//	formula2: ratio = width / height
+					//		=> ratio = (2 * xMax) / (2 * yMax)
+					//		=> ratio = xMax / yMax
+					//		=> xMax = ratio * yMax
+					//
+					//	radius² = (ratio * yMax)² + yMax²
+					//	radius² = ratio² * yMax² + yMax²
+					//	radius² = (ratio² + 1) * yMax²
+					//	yMax² = radius² / (ratio² + 1)
+					//	yMax = √(radius² / (ratio² + 1))
+
+					var yMax = Math.sqrt(radius*radius / (ratio*ratio + 1));
+					var xMax = ratio * yMax;
+					var yMin = -yMax;
+					var xMin = -xMax;
+
+					// check boundaries with found area
+					var area = Area.create(xMin, yMin, xMax, yMax);
+					var exceeded_quadrants = checkBoundaries(boundaries, area);
+					if(exceeded_quadrants == 0){
+						return area;
+					}else{
+						quadrants &= ~exceeded_quadrants;
+					}
+				}
+
+				// No sollution yet......
+				// check if the circle edge can be reached with 2 corners
+				// 2 neighboured quadrants must be left
+				var direction = 0;
+				if((quadrants & QUADRANT_TOP_LEFT) > 0){
+					if((quadrants & QUADRANT_TOP_RIGHT) > 0){
+						direction = ALIGN_TOP;
+					}else if((quadrants & QUADRANT_BOTTOM_LEFT) > 0){
+						direction = ALIGN_LEFT;
+					}
+				}else if((quadrants & QUADRANT_BOTTOM_RIGHT) > 0){
+					if((quadrants & QUADRANT_TOP_RIGHT) > 0){
+						direction = ALIGN_RIGHT;
+					}else if((quadrants & QUADRANT_BOTTOM_LEFT) > 0){
+						direction = ALIGN_BOTTOM;
+					}
+				}
+
+				if(direction != 0){
+					System.println("2 corners, direction = " + direction + ", quadrants = " + quadrants);
+					// change to uniform direction top, for generic calculations
+					var ratio_ = ratio;
+					var offset = boundaries.yMin;
+					if(direction == ALIGN_BOTTOM){
+						offset = -boundaries.yMax;
+					}else if(direction == ALIGN_LEFT){
+						offset = -boundaries.xMax;
+						ratio_ = 1/ratio;
+					}else if(direction == ALIGN_RIGHT){
+						offset = boundaries.xMin;
+						ratio_ = 1/ratio;
+					}
+
+					// this functions returns 2 Float values: max and range
+					//		max: the distance from the center to the outer rectangel side
+					//		range: the distance from the center to both sides of the rectangle
+					//
+					//         radius   ↑      ┌─────────┐
+					//	(from center)   ·    ┌─○· · · · ·○─┐   ↑ max (from vertical center)
+					//	                ·  ┌─┘ ·         · └─┐ · 
+					//	                ·  │   ·         ·   │ ·
+					//	                ─  │   ·    +    ·   │ ─
+					//	                   │---• · · · · •---│ ↓ offset (from vertical center)
+					//	                   └─┐             ┌─┘
+					//	                     └─┐         ┌─┘
+					//	                       └─────────┘
+					//       						       <----|---->
+					//	                     -range | +range  (from horizontal center)
+					//	                       <--------->
+					//                          2 * range
+			
+					//	formula1:	radius² = x² + y²
+					//		radius² = range² + max²
+					//	formula2: ratio = width / height
+					//		ratio = 2*range / (max - offset)
+					//	=> range = ratio * (max - offset) / 2
+			
+					//	combine: radius² = range² + max² AND range = ratio * (max - offset) / 2
+					//	=> radius² = (ratio * (max - offset) / 2)² + max²
+					//	use abc formula where max is the value to be calculated: (all other variables are known)
+					//	=> (ratio/2 * (max - offset))² + max² - radius² = 0
+					//	=> (ratio/2 * max - ratio/2*offset)² + max² - radius² = 0
+					//	=> (ratio/2)² * max² -2 * ratio/2 * max * ratio/2*offset + (ratio/2*offset)² + max² - radius² = 0
+					//	=> (1+(ratio/2)²) * max² + (-2 * ratio/2 * ratio/2*offset) * max + (ratio/2*offset)² - radius² = 0
+					//	=>	a = 1+(ratio/2)²
+					//			b = -2 * ratio/2 * ratio/2 * offset = -ratio²/2 * offset
+					//			c = (ratio/2*offset)² - radius²
+					//	=>	D = b² - 4*a*c
+					//	=>	max = (-b ± √D)/(2 * a)
+
+					var a = 1+Math.pow(ratio_/2, 2);
+					var b = -ratio_*ratio_/2 * offset;
+					var c = Math.pow(ratio_/2 * offset, 2) - radius*radius;
+					var results = MyMath.getAbcFormulaResults(a, b, c);
+					var yMax = results[1];
+					var yMin = offset;
+					var xMax = ratio_ * (yMax - yMin) / 2;
+					var xMin = -xMax;
+
+					var area = Area.create(xMin, yMin, xMax, yMax);
+
+					// change back to original direction
+					if(direction == ALIGN_BOTTOM){
+						area.flipVertical();
+					}else if(direction == ALIGN_LEFT){
+						area.rotateToNextQuadrant();
+					}else if(direction == ALIGN_RIGHT){
+						area.rotateToPreviousQuadrant();
+					}
+
+					// check boundaries
+					var exceeded_quadrants = checkBoundaries(boundaries, area);
+					if(exceeded_quadrants == 0){
+						return area;
+					}else{
+						quadrants &= ~exceeded_quadrants;
+					}
+				}
+
+				// No sollution yet......
+				// Check if edge of circle can be reached at 1 corner
+				if(quadrants > 0){
+					System.println("single corner, quadrants: " + quadrants);
+
+					// transpose align direction to QUADRANT_TOP_RIGHT
+					var xOffset = boundaries.xMin;
+					var yOffset = boundaries.yMin;
+					if((quadrants & QUADRANT_BOTTOM_RIGHT) > 0){
+						// flip vertical
+						yOffset = -boundaries.yMax;
+					}else if((quadrants & QUADRANT_TOP_LEFT) > 0){
+						// flip horizontal
+						xOffset = -boundaries.xMax;
+					}else if((quadrants & QUADRANT_BOTTOM_LEFT) > 0){
+						// flip horizontal + vertical
+						xOffset = -boundaries.xMax;
+						yOffset = -boundaries.yMax;
+					}
+
+					// this functions returns 2 Float values: xMax, yMax which indicate the top left corner of the found rectangle with given ratio
+					//         radius   ↑      ┌─┬───────┐
+					//	(from center)   ·    ┌─┘ •· · · ·○─┐   ↑ yMax (from vertical center)
+					//	                ·  ┌─┘   │       · └─┐ · 
+					//	                ·  │     │       ·   │ ·
+					//	                ─  │     │  +    ·   │ ─
+					//	                   │     •───────•───│ ↓ yOffset (from vertical center)
+					//	                   └─┐             ┌─┘
+					//	                     └─┐         ┌─┘
+					//	                       └─────────┘
+					//       						         <--|---->
+					//	                     xOffset| xMax  (from horizontal center)
+					//
+					//	xOffset -> x
+					//	yOffset -> y
+					//	radius -> r
+					//	ratio -> C
+					//
+					//	(x+w)²+(y+h)²=r²
+					//	h=w/C	→	(x+w)²+(y+w/C)²=r²	
+					//	(x²+2wx+w²) + (y²+(2y/C)w+(1/C²)w²) = r²
+					//	(1+1/C²)*w² + (2x+2y/C)*w + (x²+y²-r²) = 0
+					//
+					//	w? -> use abc formula where w->x
+					//
+					//	ax² + bx + c = 0
+					//
+					//	a = (1+1/C²)
+					//	b = (2x+2y/C)
+					//	c = (x²+y²-r²)
+
+					var a = 1 + 1/(ratio*ratio);
+					var b = 2 * xOffset + 2 * yOffset / ratio;
+					var c = xOffset * xOffset + yOffset * yOffset - radius * radius;
+					var results = MyMath.getAbcFormulaResults(a, b, c);
+					var w = MyMath.max(results); // use the positive result
+					var h = w / ratio;
+					var yMax = yOffset + h;
+					var xMax = xOffset + w;
+					var yMin = yOffset;
+					var xMin = xOffset;
+					var area = Area.create(xMin, yMin, xMax, yMax);
+
+					// transpose back to original orientation
+					if((quadrants & QUADRANT_BOTTOM_RIGHT) > 0){
+						area.flipVertical();
+					}else if((quadrants & QUADRANT_TOP_LEFT) > 0){
+						area.flipHorizontal();
+					}else if((quadrants & QUADRANT_BOTTOM_LEFT) > 0){
+						area.flipHorizontal();
+						area.flipVertical();
+					}
+					System.println("temp result: " + area);
+
+					// check boundaries
+					var exceeded_quadrants = checkBoundaries(boundaries, area);
+					if(exceeded_quadrants == 0){
+						return area;
+					}else{
+						quadrants &= ~exceeded_quadrants;
+					}
+				}
+				// No restrictions for the edge found
+				System.println("no edges, only boundaries, quadrants: " + quadrants);
+				return SimpleLayoutHelper.getAreaWithRatio(boundaries, ratio);
+			}
+
+			private function checkBoundaries(boundaries as Area, area as Area) as Quadrant|Number{
+				// this number results with the quadrants in which the limits are exceeded
+				var quadrants_exceeded = 0;
+				if(area.xMin < boundaries.xMin - 0.01){ quadrants_exceeded |= (QUADRANT_TOP_LEFT | QUADRANT_BOTTOM_LEFT); }
+				if(area.xMax > boundaries.xMax + 0.01){ quadrants_exceeded |= (QUADRANT_TOP_RIGHT | QUADRANT_BOTTOM_RIGHT); }
+				if(area.yMin < boundaries.yMin - 0.01){ quadrants_exceeded |= (QUADRANT_BOTTOM_LEFT | QUADRANT_BOTTOM_RIGHT); }
+				if(area.yMax > boundaries.yMax + 0.01){ quadrants_exceeded |= (QUADRANT_TOP_LEFT | QUADRANT_TOP_RIGHT); }
+				if(quadrants_exceeded > 0){
+					System.println(Lang.format("Failed Result: $1$, exceeded quadrants: $2$", [area, quadrants_exceeded]));
+				}
+				return quadrants_exceeded;
+			}
+		}
+
 		class LayoutHelper{
 			enum Alignment {
 				ALIGN_TOP = 1,
@@ -23,12 +437,7 @@ module MyModule{
 			hidden var yMin as Float = 0.0f;
 			hidden var yMax as Float = 0.0f;
 		
-			function initialize(boundaries as {
-				:x as Numeric,
-				:y as Numeric,
-				:width as Numeric, 
-				:heigth as Numeric
-			} or Null ){
+			function initialize(boundaries as {	:x as Numeric, :y as Numeric, :width as Numeric, :heigth as Numeric} or Null ){
 				self.deviceSettings = System.getDeviceSettings();
 				self.radius = 0.5f * MyMath.max([deviceSettings.screenHeight, deviceSettings.screenWidth]  as Array<Number>).toFloat();
 		
@@ -283,15 +692,7 @@ module MyModule{
 
 				if(w<0 || h<0){
 					return null;
-/*				}else if(ratio * h > w){
-					var dh = (h - (w / ratio));
-					h -= dh;
-					y1 += dh/2;
-				}else if(ratio * h < w){
-					var dw = (w - (h * ratio));
-					w -= dw;
-					x1 += dw/2;
-*/				}
+				}
 
 				return [
 					x1, // x
@@ -416,10 +817,7 @@ module MyModule{
 				] as Array<Number>;
 			}
 		
-			private static function getLimitsForRatio_4Corners(ratio as Float, radius as Float) as {
-				:xMax as Float,
-				:yMax as Float
-			}{
+			private static function getLimitsForRatio_4Corners(ratio as Float, radius as Float) as { :xMax as Float, :yMax as Float	}{
 				// this functions returns 2 Float values: xMax, yMax which indicate the top left corner of the found rectangle with given ratio
 				//         radius   ↑      ┌─────────┐
 				//	(from center)   ·    ┌─○· · · · ·○─┐   ↑ yMax (from vertical center)
@@ -454,10 +852,7 @@ module MyModule{
 				};
 			}
 
-			private static function getLimitsForRatio_2Corners(ratio as Float, offset as Float, radius as Float) as {
-				:max as Float, 
-				:range as Float
-			} {
+			private static function getLimitsForRatio_2Corners(ratio as Float, offset as Float, radius as Float) as { :max as Float, :range as Float } {
 				// this functions returns 2 Float values: max and range
 				//		max: the distance from the center to the outer rectangel side
 				//		range: the distance from the center to both sides of the rectangle
@@ -507,10 +902,7 @@ module MyModule{
 				};
 			}
 
-			private static function getLimitsForRatio_1Corner(ratio as Float, xOffset as Float, yOffset as Float, radius as Float) as { 
-				:xMax as Float, 
-				:yMax as Float
-			}{
+			private static function getLimitsForRatio_1Corner(ratio as Float, xOffset as Float, yOffset as Float, radius as Float) as { :xMax as Float, :yMax as Float }{
 				// this functions returns 2 Float values: xMax, yMax which indicate the top left corner of the found rectangle with given ratio
 				//         radius   ↑      ┌─┬───────┐
 				//	(from center)   ·    ┌─┘ •· · · ·○─┐   ↑ yMax (from vertical center)
