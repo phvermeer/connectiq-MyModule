@@ -53,7 +53,7 @@ module MyModule{
 			function getBoundaries() as Array<Numeric>{
 				return [
 					xMin + radius, // x
-					yMin + radius, // y
+					radius - yMax, // y
 					xMax - xMin, // width
 					yMax - yMin, // height
 				] as Array<Numeric>;
