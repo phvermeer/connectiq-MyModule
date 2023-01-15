@@ -8,6 +8,14 @@ module MyModule{
 
 	(:Layout)
 	module Layout {
+		function createLayoutHelper() as LayoutHelper{
+			var deviceSettings = System.getDeviceSettings();
+			if(deviceSettings.screenShape == System.SCREEN_SHAPE_ROUND){
+				return new RoundScreenLayoutHelper(deviceSettings.screenWidth/2);
+			}else{
+				return new LayoutHelper();
+			}
+		}
 
 		enum AlignDirection {
 			ALIGN_LEFT = 1,
@@ -59,10 +67,10 @@ module MyModule{
 			}
 
 			function clone() as Area{ return Area.create(xMin, yMin, xMax, yMax); }
-			function getLocX() as Numeric{ return xMin + xOffset; }
-			function getLocY() as Numeric { return yOffset - yMax; }
-			function getWidth() as Numeric{ return xMax - xMin; }
-			function getHeight() as Numeric{ return yMax - yMin; }
+			function locX() as Numeric{ return xMin + xOffset; }
+			function locY() as Numeric { return yOffset - yMax; }
+			function width() as Numeric{ return xMax - xMin; }
+			function height() as Numeric{ return yMax - yMin; }
 			function rotateToNextQuadrant() as Void{
 				var xMin = self.xMin;
 				self.xMin = -yMax;
@@ -88,18 +96,18 @@ module MyModule{
 				self.yMax = -yMin;
 			}
 			function toString() as String{
-//				return Lang.format("(x, y) = ($1$, $2$), (width, height) = ($3$, $4$)", [getLocX(), getLocY(), getWidth(), getHeight()]);
-				return Lang.format("xyMin = ($1$, $2$), xyMax = ($3$, $4$)", [xMin, yMin, xMax, yMax]);
+				return Lang.format("(x, y) = ($1$, $2$), (width, height) = ($3$, $4$)", [locX(), locY(), width(), height()]);
+				// return Lang.format("xyMin = ($1$, $2$), xyMax = ($3$, $4$)", [xMin, yMin, xMax, yMax]);
 			}
 		}
 
-		class SimpleLayoutHelper{
+		class LayoutHelper{
 			// Simple helper not taking account of round edges
 
-			function getAreaWithRatio(boundaries as Area, ratio as Float) as Area{
+			function getAreaWithRatio(boundaries as Area, ratio as Float) as Area|Null{
 				// returnes an area with given ratio (=width/height) within given boundaries
-				var w = boundaries.getWidth();
-				var h = boundaries.getHeight();
+				var w = boundaries.width();
+				var h = boundaries.height();
 				var r = w/h;
 
 				if(r > ratio){
@@ -127,36 +135,35 @@ module MyModule{
 				var bottom = (alignment & ALIGN_BOTTOM) > 0;
 
 				// horizontal alignment
-				var dx = (left && !right) ? boundaries.xMin - area.xMin // align left
-					: (right && !left) ? area.xMax - boundaries.xMax  // align right
-					: ((area.xMin + area.xMax) - (boundaries.xMin + boundaries.xMax))/2; // align centered
+				var dx = (left && !right) ? area.xMin - boundaries.xMin // align left
+					: (right && !left) ? boundaries.xMax - area.xMax  // align right
+					: ((boundaries.xMin + boundaries.xMax) - (area.xMin + area.xMax))/2; // align centered
+
+				// vertical alignment
+				var dy = (top && !bottom) ? boundaries.yMax - area.yMax	// align top
+					: (bottom && !top) ? boundaries.yMin - area.yMin	// align bottom
+					: ((boundaries.yMin + boundaries.yMax) - (area.yMin + area.yMax))/2; // align middle
 
 				area.xMin += dx;
 				area.xMax += dx;
-
-				// vertical alignment
-				var dy = (top && !bottom) ? boundaries.yMin - area.yMin	// align top
-					: (bottom && !top) ? area.yMax - boundaries.yMax	// align bottom
-					: ((area.yMin + area.yMax) - (boundaries.yMin + boundaries.yMax))/2; // align middle
-
 				area.yMin += dy;
 				area.yMax += dy;
 			}		
 		}
 
-		class RoundScreenLayoutHelper extends SimpleLayoutHelper{
+		class RoundScreenLayoutHelper extends LayoutHelper{
 			var radius as Number;
 
 			function initialize(radius as Number){
 				self.radius = radius;
-				SimpleLayoutHelper.initialize();
+				LayoutHelper.initialize();
 			}
 
 			function setAreaAligned(boundaries as Area, area as Area, alignment as AlignDirection|Number) as Void{
-				SimpleLayoutHelper.setAreaAligned(boundaries, area, alignment);
+				LayoutHelper.setAreaAligned(boundaries, area, alignment);
 			}
 
-			function getAreaWithRatio(boundaries as Area, ratio as Float) as Area {
+			function getAreaWithRatio(boundaries as Area, ratio as Float) as Area|Null {
 				// check in which quadrants the space (=boundaries) is in
 				var quadrants = 0;
 				if(boundaries.yMax > 0){
@@ -405,7 +412,7 @@ module MyModule{
 				}
 				// No restrictions for the edge found
 				System.println("no edges, only boundaries, quadrants: " + quadrants);
-				return SimpleLayoutHelper.getAreaWithRatio(boundaries, ratio);
+				return LayoutHelper.getAreaWithRatio(boundaries, ratio);
 			}
 
 			private function checkBoundaries(boundaries as Area, area as Area) as Quadrant|Number{
@@ -421,7 +428,7 @@ module MyModule{
 				return quadrants_exceeded;
 			}
 		}
-
+/*
 		class LayoutHelper{
 			enum Alignment {
 				ALIGN_TOP = 1,
@@ -948,5 +955,6 @@ module MyModule{
 				};
 			}
 		}
+*/
 	}
 }
