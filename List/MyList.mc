@@ -73,7 +73,7 @@ module MyModule{
 
 				if(_current == item){
 					// update current pointer
-					_current = previous;
+					_current = (previous != null) ? previous : next;
 				}
 
 				// break links to other items in the list
