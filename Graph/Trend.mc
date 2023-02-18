@@ -18,14 +18,25 @@ module MyModule{
 			hidden var series as Array<Graph.Serie> = [] as Array<Graph.Serie>;
 			hidden var align as Alignment or Number = HALIGN_LEFT | VALIGN_CENTER;
 			hidden var xRangeMin as Numeric = 20.0f;
-			hidden var xCurrent as Numeric or Null;
-			hidden var yCurrent as Numeric or Null;
 
 			public var frameColor as Graphics.ColorType = Graphics.COLOR_BLACK;
 			public var textColor as Graphics.ColorType = Graphics.COLOR_BLACK;
 			public var xyMarkerColor as Graphics.ColorType = Graphics.COLOR_BLACK;
 			public var maxMarkerColor as Graphics.ColorType = Graphics.COLOR_RED;
 			public var minMarkerColor as Graphics.ColorType = Graphics.COLOR_GREEN;
+
+			// values to calculate screen positions from x,y
+			// (these values are updates when frame is drawn)
+			hidden var topMargin as Numeric = 0;
+			hidden var leftMargin as Numeric = 0;
+			hidden var innerWidth as Numeric = 0;
+			hidden var innerHeight as Numeric = 0;
+			
+			// (these values are determined when series are drawn)
+			hidden var xOffset as Numeric = 0;
+			hidden var yOffset as Numeric = 0;
+			hidden var xFactor as Numeric = 0;
+			hidden var yFactor as Numeric = 0;
 
 			function initialize(options as {
 				:locX as Number, 
@@ -47,18 +58,23 @@ module MyModule{
 			}
 
 			function draw(dc as Dc){
-				// collect data
 				if(series == null){ return; }
 
-				// draw frame
+				drawFrame(dc);
+				drawSeries(dc);
+			}
+
+			protected function drawFrame(dc as Dc) as Void{
+
 				var font = Graphics.FONT_XTINY;
 				var labelHeight = dc.getFontHeight(font);
-				var topMargin = labelHeight + 6; // space for the markers
+				self.topMargin = labelHeight + 6; // space for the markers
 				var bottomMargin = 0; // space for the min/max distance 
 				var axisWidth = 2;
 				var axisMargin = 0.5f + Math.ceil(0.5f * axisWidth); // space for the axis width
-				var innerHeight = height - (topMargin + bottomMargin + axisMargin);
-				var innerWidth = width - (2 * axisMargin);
+				self.leftMargin = axisMargin;
+				self.innerHeight = height - (topMargin + bottomMargin + axisMargin);
+				self.innerWidth = width - (2 * axisMargin);
 
 				// draw the xy-axis frame
 				dc.setPenWidth(axisWidth);
@@ -66,34 +82,51 @@ module MyModule{
 				dc.drawLine(locX, locY+topMargin, locX, locY+height-bottomMargin);
 				dc.drawLine(locX, locY+height-bottomMargin, locX+width, locY+height-bottomMargin);
 				dc.drawLine(locX+width, locY+topMargin, locX+width, locY+height-bottomMargin);
+			}
 				
-				// determine the generic limits (xMin, xMax, yMin, yMax)
-				if(series.size() > 0){
-					var data = series[0].data;
-					var xMin = data.xMin;
-					var xMax = data.xMax;
-					var yMin = data.yMin;
-					var yMax = data.yMax;
-					for(var s=0; s<series.size(); s++){
-						data = series[s].data;
-						if(data.xMin < xMin) { xMin = data.xMin; }
-						if(data.xMax > xMax) { xMax = data.xMax; }
-						if(data.yMin < yMin) { yMin = data.yMin; }
-						if(data.yMax > yMax) { yMax = data.yMax; }
+			protected function drawSeries(dc as Dc) as Void{
+				// determine min and max values
+
+				// calculate graph limits
+				var xMin = 0;
+				var xMax = 0;
+				var yMin = 0;
+				var yMax = 0;
+
+				if(self.series.size() > 0){
+					for(var i=0; i<series.size(); i++){
+						var data = series[i].data;
+						if(i==0){
+							xMin = data.xMin;
+							xMax = data.xMax;
+							yMin = data.yMin;
+							yMax = data.yMax;
+						}else{
+							if(data.xMin < xMin) { xMin = data.xMin; }
+							if(data.xMax > xMax) { xMax = data.xMax; }
+							if(data.yMin < yMin) { yMin = data.yMin; }
+							if(data.yMax > yMax) { yMax = data.yMax; }
+						}
 					}
+
 					if(xMin >= xMax) { return; }
 					if(yMin >= yMax) { return; }
 
-					var xFactor = innerWidth / (xMax - xMin);
-					var yFactor = -1 * innerHeight / (yMax - yMin);
-					var xOffset = axisMargin + locX - xMin * xFactor;
-					var yOffset = locY + topMargin + innerHeight - yMin * yFactor;
+					// the following values are also used when drawing the current position
+					self.xFactor = innerWidth / (xMax - xMin);
+					self.yFactor = -1 * innerHeight / (yMax - yMin);
+					self.xOffset = locX + leftMargin - xMin * xFactor;
+					self.yOffset = locY + topMargin + innerHeight - yMin * yFactor;
 
+					// now do the drawing
 					for(var s=0; s<series.size(); s++){
 						var serie = series[s];
 						if(serie.data != null){
 							var pts = serie.data.pts;
-							if(pts.size() < 2){ return; }
+							if(pts.size() < 2){
+								// skip this serie
+								continue;
+							}
 
 							var ptFirst = pts[0];
 							var ptLast = pts[pts.size()-1];
@@ -145,6 +178,7 @@ module MyModule{
 									}
 								}
 
+								// Draw min and max values
 								// Min value
 								if((serie.markers != null) && (serie.data.ptMin != null) && (MARKER_MIN == MARKER_MIN)){
 									var ptMin = serie.data.ptMin as Array<Numeric>;
@@ -154,10 +188,11 @@ module MyModule{
 										dc, 
 										xOffset + xFactor * ptMin[0], 
 										yOffset + yFactor * ptMin[1], 
-										axisMargin, 
+										leftMargin, 
 										ptMin[1].format("%d")
 									);
 								}
+
 								// Max value
 								if((serie.markers != null) && (serie.data.ptMax != null) && (MARKER_MAX == MARKER_MAX)){
 									var ptMax = serie.data.ptMax as Array<Numeric>;
@@ -166,39 +201,29 @@ module MyModule{
 										dc, 
 										xOffset + xFactor * ptMax[0], 
 										yOffset + yFactor * ptMax[1], 
-										axisMargin, 
+										leftMargin, 
 										ptMax[1].format("%d")
 									);
 								}
 							}
 						}
 					}
-					// draw current x and y markers
-					if(xCurrent != null){
-						var x = xOffset + xFactor * xCurrent;
-						dc.setColor(xyMarkerColor, Graphics.COLOR_TRANSPARENT);
-						dc.setPenWidth(1);
-						dc.drawLine(x, locY, x, locY + height);
-					}
-					if(yCurrent != null){
-						var y = yOffset + yFactor * yCurrent;
-						dc.setColor(xyMarkerColor, Graphics.COLOR_TRANSPARENT);
-						dc.setPenWidth(1);
-						dc.drawLine(xOffset, y, xOffset + xMax * xFactor, y);
-					}
 				}
 			}
-			
-			public function setCurrentX(x as Numeric or Null) as Void{
-				// This will draw the current X marker in the graph
-				self.xCurrent = x;			
+
+			public function drawCurrentXY(dc as Dc, x as Numeric, y as Numeric) as Void{
+				// draw current x and y markers
+				dc.setColor(xyMarkerColor, Graphics.COLOR_TRANSPARENT);
+				dc.setPenWidth(1);
+
+				var xScreen = xOffset + xFactor * x;
+				dc.drawLine(xScreen, locY + topMargin, xScreen, locY + topMargin + innerHeight);
+
+				var yScreen = yOffset + yFactor * y;
+				dc.drawLine(locX + leftMargin, yScreen, locX + leftMargin + innerWidth, yScreen);
 			}
-			public function setCurrentY(y as Numeric or Null) as Void{
-				// This will draw the current X marker in the graph
-				self.yCurrent = y;			
-			}
-			
-			protected function drawMarker(dc as Graphics.Dc, x as Numeric, y as Numeric, margin as Numeric, text as String) as Void{
+
+			protected function drawMarker(dc as Dc, x as Numeric, y as Numeric, margin as Numeric, text as String) as Void{
 				var font = Graphics.FONT_XTINY;
 				var w2 = dc.getTextWidthInPixels(text, font)/2;
 				var h = dc.getFontHeight(font);
@@ -220,7 +245,7 @@ module MyModule{
 			public function setDarkMode(darkMode as Boolean) as Void{
 				self.textColor = darkMode ? Graphics.COLOR_WHITE : Graphics.COLOR_BLACK;
 				self.frameColor = darkMode ? Graphics.COLOR_LT_GRAY : Graphics.COLOR_DK_GRAY;
-				self.xyMarkerColor = darkMode ? Graphics.COLOR_WHITE : Graphics.COLOR_BLACK;
+				self.xyMarkerColor = darkMode ? Graphics.COLOR_WHITE : Graphics.COLOR_BLACK;				
 				self.minMarkerColor = darkMode ? Graphics.COLOR_RED : Graphics.COLOR_DK_RED;
 				self.maxMarkerColor = darkMode ? Graphics.COLOR_GREEN : Graphics.COLOR_DK_GREEN;
 			}
