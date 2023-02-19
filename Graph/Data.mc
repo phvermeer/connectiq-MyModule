@@ -28,6 +28,7 @@ module MyModule{
 			var pts as Array< Array<Numeric> > = [] as Array< Array<Numeric> >; // array containing all stored datapoints
 			
 			// timer to add data in smaller parts to prevent "Error: Watchdog Tripped Error - Code Executed Too Long"
+			public var onLoaded as Method|Null;
 			hidden var bufferTimer as Timer.Timer = new Timer.Timer();
 			hidden var buffer as Array< Array<Numeric> > = [] as Array< Array<Numeric> >; // buffer of array with [x,y] values
 			hidden var bufferBusy as Boolean = false; // indicates if the bufferTimer is running
@@ -41,7 +42,10 @@ module MyModule{
 						
 				filter = new VisvalingamFilter({:maxCount => reducedCount as Number});
 			}
-			
+
+			function isLoading() as Boolean{
+				return bufferBusy;
+			}
 			hidden function addToBuffer(x as Numeric, y as Numeric) as Void{
 				buffer.add([x,y] as Array<Numeric>);
 				// start timer to process the buffered items 
@@ -70,6 +74,9 @@ module MyModule{
 					bufferTimer.stop();
 					bufferBusy = false;
 					// System.println("Finished processing");
+					if(onLoaded != null){
+						onLoaded.invoke();
+					}
 				}
 			}
 			
