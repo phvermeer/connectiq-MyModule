@@ -11,38 +11,43 @@ module MyModule{
 		class Data{
 			// working variables
 			var maxCount as Number;
-			var filter as Filter;
-			protected var initialized as Boolean = false; // indicates if init after 1st point was done
+			var filter as VisvalingamFilter;
+			hidden var initialized as Boolean = false; // indicates if init after 1st point was done
 
 			// point indicators for min and max values
 			var ptMin as Array or Null = null; // point containing the lowest value
 			var ptMax as Array or Null = null; // point containing the highest value
 
 			// current min and max values
-			var xMin as Float;
-			var xMax as Float;
-			var yMin as Float;
-			var yMax as Float;
+			var xMin as Numeric = 0;
+			var xMax as Numeric = 0;
+			var yMin as Numeric = 0;
+			var yMax as Numeric = 0;
 
 			// data and calculating averages
-			var pts as Lang.Array = []; // array containing all stored datapoints
+			var pts as Array< Array<Numeric> > = [] as Array< Array<Numeric> >; // array containing all stored datapoints
 			
 			// timer to add data in smaller parts to prevent "Error: Watchdog Tripped Error - Code Executed Too Long"
-			protected var bufferTimer as Timer = new Timer.Timer();
-			protected var buffer as Array< Array<Numeric> > = []; // buffer of array with [x,y] values
-			protected var bufferBusy as Boolean = false; // indicates if the bufferTimer is running
+			public var onLoaded as Method|Null;
+			hidden var bufferTimer as Timer.Timer = new Timer.Timer();
+			hidden var buffer as Array< Array<Numeric> > = [] as Array< Array<Numeric> >; // buffer of array with [x,y] values
+			hidden var bufferBusy as Boolean = false; // indicates if the bufferTimer is running
 
 			function initialize(options as {
 				:maxCount as Number, 
 				:reducedCount as Number,
 			}){
-				me.maxCount = options.hasKey(:maxCount) ? options.get(:maxCount) : 60;
-				var reducedCount = (options.hasKey(:reducedCount)) ? options.get(:reducedCount) : maxCount * 3 / 4;
-				filter = new VisvalingamFilter({:maxCount => reducedCount});
+				maxCount = options.hasKey(:maxCount) ? options.get(:maxCount)as Number: 60;
+				var reducedCount = options.hasKey(:reducedCount) ? options.get(:reducedCount) : (maxCount * 3 / 4).toNumber();
+						
+				filter = new VisvalingamFilter({:maxCount => reducedCount as Number});
 			}
-			
-			protected function addToBuffer(x as Numeric, y as Numeric) as Void{
-				buffer.add([x,y]);
+
+			function isLoading() as Boolean{
+				return bufferBusy;
+			}
+			hidden function addToBuffer(x as Numeric, y as Numeric) as Void{
+				buffer.add([x,y] as Array<Numeric>);
 				// start timer to process the buffered items 
 				
 				if(!bufferBusy){
@@ -53,11 +58,11 @@ module MyModule{
 					bufferBusy = true;
 				}
 			}
-			function bufferProcess(){
+			function bufferProcess() as Void{
 				// process some items of the buffer
-				var count = MyMath.min([me.buffer.size(), 10]);
+				var count = MyMath.min([self.buffer.size(), 10] as Array<Number>) as Number;
 				var items = buffer.slice(null, count);
-				me.buffer = buffer.slice(count, null);
+				self.buffer = buffer.slice(count, null);
 				
 				for(var i=0; i<items.size(); i++){
 					var xy = items[i]; 
@@ -69,13 +74,16 @@ module MyModule{
 					bufferTimer.stop();
 					bufferBusy = false;
 					// System.println("Finished processing");
+					if(onLoaded != null){
+						onLoaded.invoke();
+					}
 				}
 			}
 			
-			public function addPoint(x as Lang.Float, y as Lang.Float) as Void{
+			public function addPoint(x as Numeric, y as Numeric) as Void{
 				addToBuffer(x,y);
 			}
-			protected function addPoint2(x as Lang.Float, y as Lang.Float){
+			protected function addPoint2(x as Numeric, y as Numeric) as Void{
 				//System.println(Lang.format("(x,y) = ( $1$, $2$ )", [x, y]));
 				if((x != null ) && (y!= null)){
 					if(!initialized){
@@ -88,7 +96,7 @@ module MyModule{
 						yMin = y;
 						yMax = y;
 
-						pts.add([x,y]);
+						pts.add([x,y] as Array<Numeric>);
 					} else {
 						// update min/max values
 						if(x < xMin){
@@ -104,7 +112,7 @@ module MyModule{
 							ptMax = [x,y];
 						}
 						// add new point
-						pts.add([x,y]);
+						pts.add([x,y] as Array<Numeric>);
 						if(pts.size() >= maxCount){
 							filter.apply(pts);
 						}

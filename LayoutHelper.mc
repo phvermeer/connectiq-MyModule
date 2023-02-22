@@ -1,7 +1,7 @@
-using Toybox.System;
-using Toybox.Math;
-using Toybox.Lang;
-using MyModule.MyMath;
+import Toybox.System;
+import Toybox.Math;
+import Toybox.Lang;
+import MyModule.MyMath;
 import MyModule.Tools;
 
 module MyModule{
@@ -16,41 +16,50 @@ module MyModule{
 				ALIGN_RIGHT = 4,
 			}
 		
-			protected var deviceSettings as System.DeviceSettings;
-			protected var radius as Lang.Float;
-			protected var xMin as Lang.Float;
-			protected var xMax as Lang.Float;
-			protected var yMin as Lang.Float;
-			protected var yMax as Lang.Float;
+			hidden var deviceSettings as DeviceSettings;
+			hidden var radius as Float;
+			hidden var xMin as Float = 0.0f;
+			hidden var xMax as Float = 0.0f;
+			hidden var yMin as Float = 0.0f;
+			hidden var yMax as Float = 0.0f;
 		
-			function initialize(boundaries as {:x as Lang.Numeric, :y as Lang.Numeric, :width as Lang.Numeric, :heigth as Lang.Numeric} or Null ){
-				me.deviceSettings = System.getDeviceSettings();
-				me.radius = 0.5f * MyMath.max([deviceSettings.screenHeight, deviceSettings.screenWidth]);
+			function initialize(boundaries as {
+				:x as Numeric,
+				:y as Numeric,
+				:width as Numeric, 
+				:heigth as Numeric
+			} or Null ){
+				self.deviceSettings = System.getDeviceSettings();
+				self.radius = 0.5f * MyMath.max([deviceSettings.screenHeight, deviceSettings.screenWidth]  as Array<Number>).toFloat();
 		
 				if(boundaries != null){
-					var x = boundaries.hasKey(:x) ? boundaries.get(:x) : 0;
-					var y = boundaries.hasKey(:y) ? boundaries.get(:y) : 0;
-					var w = boundaries.hasKey(:width) ? boundaries.get(:width) : deviceSettings.screenWidth - x;
-					var h = boundaries.hasKey(:height) ? boundaries.get(:height) : deviceSettings.screenHeight - y;
+					var x = boundaries.hasKey(:x) ? boundaries.get(:x) as Numeric : 0;
+					var y = boundaries.hasKey(:y) ? boundaries.get(:y) as Numeric : 0;
+					var w = boundaries.hasKey(:width) ? boundaries.get(:width) as Numeric : deviceSettings.screenWidth - x;
+					var h = boundaries.hasKey(:height) ? boundaries.get(:height) as Numeric : deviceSettings.screenHeight - y;
 					setBoundaries(x, y, w, h);
 				}else{
 					setBoundaries(0, 0, deviceSettings.screenWidth, deviceSettings.screenHeight);
 				}
 			}
 		
-			function setBoundaries(x as Lang.Numeric, y as Lang.Numeric, w as Lang.Numeric, h as Lang.Numeric) as Void{
-				me.xMin = x - me.radius;
-				me.xMax = x + w - me.radius;
-				me.yMin = me.radius - (y + h);
-				me.yMax = me.radius - y;
+			function setBoundaries(x as Numeric, y as Numeric, w as Numeric, h as Numeric) as Void{
+				self.xMin = (x - self.radius).toFloat();
+				self.xMax = (x + w - self.radius).toFloat();
+				self.yMin = (self.radius - (y + h)).toFloat();
+				self.yMax = (self.radius - y).toFloat();
 			}
-		
-			function getAreaByRatio(ratio as Float) as Array<Lang.Number>{
-				// Make sure the dimensions of the DataField are initialized
-				if(me.xMin == null || me.xMax ==null || me.yMin == null || me.yMax == null){
-					throw new Tools.MyException("getAreaByRatio can only be called with known boundaries");
-				}
-		
+
+			function getBoundaries() as Array<Numeric>{
+				return [
+					xMin + radius, // x
+					radius - yMax, // y
+					xMax - xMin, // width
+					yMax - yMin, // height
+				] as Array<Numeric>;
+			}
+
+			function getAreaByRatio(ratio as Float) as Array<Number> or Null{
 				// not ok untill ok is proven
 				var ok = false;
 				// placeholders  for final result
@@ -62,7 +71,6 @@ module MyModule{
 				// Check if the screen is circle shaped, otherwise the area is easier to calculate
 				if(deviceSettings.screenShape == System.SCREEN_SHAPE_ROUND){
 					// use x,y values based upon the circle center point x→ y↑
-					var radius = 0.5f * MyMath.min([deviceSettings.screenWidth, deviceSettings.screenHeight]); // screen radius
 		
 					// check where the edge could go outside the circle
 					//           ―――――
@@ -81,9 +89,9 @@ module MyModule{
 						var results = getLimitsForRatio_4Corners(ratio as Float, radius as Float);
 			
 						// determine the x,y based upon circle edge:
-						xMaxC = results.get(:xMax);
+						xMaxC = results.get(:xMax) as Float;
 						xMinC = -xMaxC;
-						yMaxC = results.get(:yMax);
+						yMaxC = results.get(:yMax) as Float;
 						yMinC = -yMaxC;
 			
 						// Check if these circle edge values are within the limits
@@ -101,192 +109,258 @@ module MyModule{
 							var result = getLimitsForRatio_2Corners(ratio, yMin, radius);
 			
 							// determine the x,y based upon these results for given quadrants
-							xMaxC = result.get(:range);
-							xMinC = -xMaxC;
-							yMaxC = result.get(:max);
+							yMaxC = result.get(:max) as Float;
 							yMinC = yMin;
-			
+
+							// Check max limit
+							if(yMaxC > yMax){
+								yMaxC = yMax;
+								xMaxC = Math.sqrt(radius*radius - yMax*yMax);
+							}else{
+								xMaxC = result.get(:range) as Float;
+							}
+							xMinC = -xMaxC;
+
 						}else if(q3 && q4){
 							// determine the bigest rectangle with given ratio within a circle (top)
 							var result = getLimitsForRatio_2Corners(ratio, -yMax, radius);
 			
 							// determine the x,y based upon these results for given quadrants
-							xMaxC = result.get(:range);
-							xMinC = -xMaxC;
+							yMinC = -(result.get(:max) as Float);
 							yMaxC = yMax;
-							yMinC = -result.get(:max);
-			
+
+							// Check max limit
+							if(yMinC < yMin){
+								yMinC = yMin;
+								xMaxC = Math.sqrt(radius*radius - yMin*yMin);
+							}else{
+								xMaxC = result.get(:range) as Float;
+							}
+							xMinC = -xMaxC;
+
+
 						}else if(q1 && q4){
 							// determine the bigest rectangle with given ratio within a circle (top)
 							var result = getLimitsForRatio_2Corners(1/ratio, xMin, radius);
 			
 							// determine the x,y based upon these results for given quadrants
-							xMaxC = result.get(:max);
+							xMaxC = result.get(:max) as Float;
 							xMinC = xMin;
-							yMaxC = result.get(:range);
+
+							// Check max limit
+							if(xMaxC > xMax){
+								xMaxC = xMax;
+								yMaxC = Math.sqrt(radius*radius - xMax*yMax);
+							}else{
+								yMaxC = result.get(:range) as Float;
+							}
 							yMinC = -yMaxC;
-			
+
 						}else if(q2 && q3){
 							// determine the bigest rectangle with given ratio within a circle (top)
 							var result = getLimitsForRatio_2Corners(1/ratio, -xMax, radius);
 			
 							// determine the x,y based upon these results for given quadrants
+							xMinC = -(result.get(:max) as Float);
 							xMaxC = xMax;
-							xMinC = -result.get(:max);
-							yMaxC = result.get(:range);
+
+							if(xMinC < xMin){
+								xMinC = xMin;
+								yMaxC = Math.sqrt(radius*radius - xMin*xMin);
+							}else{
+								yMaxC = result.get(:range) as Float;
+							}
 							yMinC = -yMaxC;
+
 						}else{
 							ok = false;
 						}
 			
 						// Check if the calculated circle edge values are within the given limits
 						if(ok){
-							if(yMaxC > yMax) { ok = false; q1 = false; q2 = false;}
-							if(yMinC < yMin) { ok = false; q3 = false; q4 = false;}
-							if(xMaxC > xMax) { ok = false; q1 = false; q4 = false;}
-							if(xMinC < xMin) { ok = false; q2 = false; q3 = false;}
+							if(yMaxC as Float > yMax) { ok = false; q1 = false; q2 = false;}
+							if(yMinC as Float < yMin) { ok = false; q3 = false; q4 = false;}
+							if(xMaxC as Float > xMax) { ok = false; q1 = false; q4 = false;}
+							if(xMinC as Float < xMin) { ok = false; q2 = false; q3 = false;}
 						}
 					}
 		
 					if(!ok){
+						ok = true;
 						// Now check if the rectangle is limited at a single corner
 						if(q1){
 							//	q1 =>
 							var results = getLimitsForRatio_1Corner(ratio as Float, xMin as Float, yMin as Float, radius as Float);
 			
 							// determine the x,y for this quadrant
-							yMaxC = results.get(:yMax);
-							yMinC = yMin;
-							xMaxC = results.get(:xMax);
+							yMaxC = results.get(:yMax) as Float;
+							xMaxC = results.get(:xMax) as Float;
 							xMinC = xMin;
+							yMinC = yMin;
 						}else if(q2){
 							//	q2 =>
 							var results = getLimitsForRatio_1Corner(ratio as Float, -xMax as Float, yMin as Float, radius as Float);
 			
 							// determine the x,y for this quadrant
 							yMinC = yMin;
-							yMaxC = results.get(:yMax);
-							xMinC = -results.get(:xMax);
+							yMaxC = results.get(:yMax) as Float;
+							xMinC = -(results.get(:xMax) as Float);
 							xMaxC = xMax;
 						}else if(q3){
 							//	q3 =>
 							var results = getLimitsForRatio_1Corner(ratio as Float, -xMax as Float, -yMax as Float, radius as Float);
 			
 							// determine the x,y for this quadrant
-							yMinC = -results.get(:yMax);
+							yMinC = -(results.get(:yMax) as Float);
 							yMaxC = yMax;
-							xMinC = -results.get(:xMax);
+							xMinC = -(results.get(:xMax) as Float);
 							xMaxC = xMax;
 						}else if(q4){
 							//	q4 =>
 							var results = getLimitsForRatio_1Corner(ratio as Float, xMin as Float, -yMax as Float, radius as Float);
 			
 							// determine the x,y for this quadrant
-							yMinC = -results.get(:yMax);
+							yMinC = -(results.get(:yMax) as Float);
 							yMaxC = yMax;
 							xMinC = xMin;
-							xMaxC = results.get(:xMax);
+							xMaxC = results.get(:xMax) as Float;
+						}else{
+							ok = false;
+						}
+						// Check if the calculated circle edge values are within the given limits
+						if(ok){
+							if(yMaxC as Float > yMax) {
+								yMaxC = yMax;
+								if(q1){
+									xMaxC = Math.sqrt(radius*radius - yMax*yMax);
+								}else if(q2){
+									xMinC = - Math.sqrt(radius*radius - yMax*yMax);
+								}
+							}
+							if(yMinC as Float < yMin) {
+								yMinC = yMin;
+								if(q4){
+									xMaxC = Math.sqrt(radius*radius - yMin*yMin);
+								}else if(q3){
+									xMinC = - Math.sqrt(radius*radius - yMin*yMin);
+								}
+							}
+							if(xMaxC as Float > xMax) {
+								xMaxC = xMax;
+								if(q1){
+									yMaxC = Math.sqrt(radius*radius - xMax*xMax);
+								}else if(q4){
+									yMinC = - Math.sqrt(radius*radius - xMax*xMax);
+								}
+							}
+							if(xMinC as Float < xMin) {
+								xMinC = xMin;
+								if(q2){
+									yMaxC = Math.sqrt(radius*radius - xMin*xMin);
+								}else if(q3){
+									yMinC = - Math.sqrt(radius*radius - xMin*xMin);
+								}
+							}
 						}
 					}
 				}
-					
+
 				if(!ok){
 					xMinC = xMin;
 					xMaxC = xMax;
 					yMinC = yMin;
 					yMaxC = yMax;
-		
-					var w = xMax - xMin;
-					var h = yMax - yMin;
-					if(ratio * h > w){
-						// trim height to get the correct ratio
-						var dy = (h - (w / ratio))/2;
-						yMinC += dy;
-						yMaxC -= dy;
-					}else{
-						// trim width to get the correct ratio
-						var dx = (w - (h * ratio))/2;
-						xMinC += dx;
-						xMaxC -= dx;
-					}
 					ok = true;
 				}
+
 				// convert to real xy coordinates:
-				var x1 = Math.ceil(xMinC + radius).toNumber();
-				var x2 = Math.floor(xMaxC + radius).toNumber();
-				var y1 = Math.ceil(radius - yMaxC).toNumber();
-				var y2 = Math.floor(radius - yMinC).toNumber();
+				var x1 = Math.ceil((xMinC as Float) + radius).toNumber();
+				var x2 = Math.floor((xMaxC as Float) + radius).toNumber();
+				var y1 = Math.ceil(radius - (yMaxC as Float)).toNumber();
+				var y2 = Math.floor(radius - (yMinC as Float)).toNumber();
+				var w = x2 - x1;
+				var h = y2 - y1;
+
+				if(w<0 || h<0){
+					return null;
+/*				}else if(ratio * h > w){
+					var dh = (h - (w / ratio));
+					h -= dh;
+					y1 += dh/2;
+				}else if(ratio * h < w){
+					var dw = (w - (h * ratio));
+					w -= dw;
+					x1 += dw/2;
+*/				}
+
 				return [
 					x1, // x
 					y1, // y
-					x2-x1, // width
-					y2-y1, // height
-				];
+					w, // width
+					h, // height
+				] as Array<Number>;
 			}
-		
-			function getAlignedPosition(align as Aligment, width as Lang.Numeric, height as Lang.Numeric) as Array<Lang.Number> or Null {
+
+			public function getAlignedPosition(align as Alignment, width as Numeric, height as Numeric) as Array<Number> or Null {
 				// This function will calculate the position (x,y) of a given rectangle (width, height) within a circle aligned to a direction within the circle and given boundaries
 		
 				// check if the rectangle fits with boundaries, otherwise align without looking at circle shape
 				if(width > (xMax-xMin)){
-					var y = radius - (yMin + yMax)/2 - height/2;
+					var y = Math.round(radius - (yMin + yMax)/2 - height/2);
 					if(align == ALIGN_LEFT){
-						var x = xMin + radius;
-						return [x, y];
+						var x = Math.round(xMin + radius);
+						return [x, y] as Array<Number>;
 					}else if(align == ALIGN_RIGHT){
-						var x = xMax - width + radius;
-						return [x, y];
+						var x = Math.round(xMax - width + radius);
+						return [x, y] as Array<Number>;
 					}
 				}
 				if(height > (yMax-yMin)){
-					var x = (xMin + xMax)/2 + radius - width/2;
+					var x = Math.round((xMin + xMax)/2 + radius - width/2);
 					if(align == ALIGN_TOP){
-						var y = radius - yMax;
-						return [x, y];
+						var y = Math.round(radius - yMax);
+						return [x, y] as Array<Number>;
 					}else if(align == ALIGN_BOTTOM){
-						var y = radius - (yMin + height);
-						return [x, y];
+						var y = Math.round(radius - (yMin + height));
+						return [x, y] as Array<Number>;
 					}
 				}
 		
 				// transpose the aligmnent direction to ALIGN_TOP
 				var ok = false;
 				var gap = null;
-				var r² = radius*radius;
+				var rr = radius*radius;
 		
 				var xMin = null, xMax = null, yMax = null, size = null; // all floats
 				if(align == ALIGN_TOP){
-					xMin = me.xMin;
-					xMax = me.xMax;
-					yMax = me.yMax;
+					xMin = self.xMin;
+					xMax = self.xMax;
+					yMax = self.yMax;
 					size = width;
 				}else if(align == ALIGN_BOTTOM){
-					xMin = -me.xMax;
-					xMax = -me.xMin;
-					yMax = -me.yMin;
+					xMin = -self.xMax;
+					xMax = -self.xMin;
+					yMax = -self.yMin;
 					size = width;
 				}else if(align == ALIGN_LEFT){
-					xMin = me.yMin;
-					xMax = me.yMax;
-					yMax = -me.xMin;
+					xMin = self.yMin;
+					xMax = self.yMax;
+					yMax = -self.xMin;
 					size = height;
 				}else if(align == ALIGN_RIGHT){
-					xMin = -me.yMax;
-					xMax = -me.yMin;
-					yMax = me.xMax;
+					xMin = -self.yMax;
+					xMax = -self.yMin;
+					yMax = self.xMax;
 					size = height;
 				}else{
-					xMin = null;
-					xMax = null;
-					yMax = null;
-					size = null;
+					return null;
 				}
 		
 				// get space at max and check if the size already fits
 				// y² + x² = radius²
 				// x = ± √ (radius² - yMax²)
-				var xMinC = MyMath.max([-Math.sqrt(r² - yMax*yMax), xMin]);
-				var xMaxC = MyMath.min([Math.sqrt(r² - yMax*yMax), xMax]);
+				var xMinC = MyMath.max([-Math.sqrt(rr - yMax*yMax), xMin] as Array<Numeric>);
+				var xMaxC = MyMath.min([Math.sqrt(rr - yMax*yMax), xMax] as Array<Numeric>);
 				var yMaxC = yMax;
 				var space = xMaxC - xMinC;
 				gap = space - size;
@@ -312,7 +386,7 @@ module MyModule{
 					// y² + x² = radius²
 					// yMax² + size2² = radius²
 					// yMax = ± √ (radius² - size2²)
-					yMaxC = Math.sqrt(r² - size2*size2);
+					yMaxC = Math.sqrt(rr - size2*size2);
 					xMinC = (xMinC == null) ? -size2 : xMinC;
 					xMaxC = (xMaxC == null) ? size2 : xMaxC;
 					gap = 0;
@@ -339,10 +413,13 @@ module MyModule{
 				return [
 					Math.round(x).toNumber(),
 					Math.round(y).toNumber()
-				];
+				] as Array<Number>;
 			}
 		
-			private static function getLimitsForRatio_4Corners(ratio as Float, radius as Float) as { :xMax as Float, :yMax as Float }{
+			private static function getLimitsForRatio_4Corners(ratio as Float, radius as Float) as {
+				:xMax as Float,
+				:yMax as Float
+			}{
 				// this functions returns 2 Float values: xMax, yMax which indicate the top left corner of the found rectangle with given ratio
 				//         radius   ↑      ┌─────────┐
 				//	(from center)   ·    ┌─○· · · · ·○─┐   ↑ yMax (from vertical center)
@@ -376,7 +453,11 @@ module MyModule{
 					:yMax => yMax,
 				};
 			}
-			private static function getLimitsForRatio_2Corners(ratio as Float, offset as Float, radius as Float) as { :max as Float, :range as Float } {
+
+			private static function getLimitsForRatio_2Corners(ratio as Float, offset as Float, radius as Float) as {
+				:max as Float, 
+				:range as Float
+			} {
 				// this functions returns 2 Float values: max and range
 				//		max: the distance from the center to the outer rectangel side
 				//		range: the distance from the center to both sides of the rectangle
@@ -425,7 +506,11 @@ module MyModule{
 					:range => range,
 				};
 			}
-			private static function getLimitsForRatio_1Corner(ratio as Float, xOffset as Float, yOffset as Float, radius as Float) as { :xMax as Float, :yMax as Float } {
+
+			private static function getLimitsForRatio_1Corner(ratio as Float, xOffset as Float, yOffset as Float, radius as Float) as { 
+				:xMax as Float, 
+				:yMax as Float
+			}{
 				// this functions returns 2 Float values: xMax, yMax which indicate the top left corner of the found rectangle with given ratio
 				//         radius   ↑      ┌─┬───────┐
 				//	(from center)   ·    ┌─┘ •· · · ·○─┐   ↑ yMax (from vertical center)
@@ -439,32 +524,37 @@ module MyModule{
 				//       						         <--|---->
 				//	                     xOffset| xMax  (from horizontal center)
 				//
-				//	radius² = xMax² + yMax²
-				//	ratio = (xMax + xOffset) / (yMax + yOffset)
-				//	=>	ratio * (yMax + yOffset) = (xMax + xOffset)
-				//	=>	xMax = ratio * (yMax + yOffset) - xOffset 
+				//	xOffset -> x
+				//	yOffset -> y
+				//	radius -> r
+				//	ratio -> C
 				//
-				//	radius² = (ratio * (yMax + yOffset) - xOffset)² + yMax²
-				//	=> (ratio * (yMax + yOffset) - xOffset)² + yMax² - radius² = 0
-				//	=> (ratio * yMax + ratio * yOffset - xOffset)² + yMax² - radius² = 0
-		
-				//	=> (ratio * yMax)² + 2 * (ratio * yMax) * (ratio * yOffset - xOffset) + (ratio * yOffset - xOffset)² + yMax² - radius² = 0
-				//	=> (ratio² + 1) * yMax²	+ (2 * ratio * (ratio * yOffset - xOffset))	* yMax + (ratio * yOffset - xOffset)² - radius² = 0
-		
-				//	a = (ratio² + 1)
-				//	b = (2 * ratio * (ratio * yOffset - xOffset))
-				//	c = (ratio * yOffset - xOffset)² - radius²
-				var a = ratio*ratio + 1;
-				var b = 2 * ratio * (ratio * yOffset - xOffset);
-				var c = Math.pow(ratio * yOffset - xOffset, 2) - radius*radius;
+				//	(x+w)²+(y+h)²=r²
+				//	h=w/C	→	(x+w)²+(y+w/C)²=r²	
+				//	(x²+2wx+w²) + (y²+(2y/C)w+(1/C²)w²) = r²
+				//	(1+1/C²)*w² + (2x+2y/C)*w + (x²+y²-r²) = 0
+				//
+				//	w? -> use abc formula where w->x
+				//
+				//	ax² + bx + c = 0
+				//
+				//	a = (1+1/C²)
+				//	b = (2x+2y/C)
+				//	c = (x²+y²-r²)
+
+				var a = 1 + 1/(ratio*ratio);
+				var b = 2 * xOffset + 2 * yOffset / ratio;
+				var c = xOffset * xOffset + yOffset * yOffset - radius * radius;
 				var results = MyMath.getAbcFormulaResults(a, b, c);
-				var yMax = results[1];
-				var xMax = ratio * (yMax + yOffset) - xOffset;
+				var w = MyMath.max(results); // use the positive result
+				var h = w / ratio;
+				var yMax = yOffset + h;
+				var xMax = xOffset + w;
 				return {
 					:xMax => xMax,
 					:yMax => yMax,
 				};
-			}	
+			}
 		}
 	}
 }

@@ -1,5 +1,6 @@
 import Toybox.Lang;
 import Toybox.Graphics;
+import Toybox.System;
 
 module MyModule{
 	(:Tools)
@@ -9,7 +10,7 @@ module MyModule{
 			var R = (color & (255 << 16)) >> 16;
 			var G = (color & (255 << 8)) >> 8;
 			var B = (color & 255);
-			return [R,G,B];
+			return [R,G,B] as Array<Number>;
 		}
 
 		function formatDistance(distance as Float) as String{
@@ -43,7 +44,7 @@ module MyModule{
 			}
 		}
 
-		function adjustFont(dc as Graphics.Dc, baseFont as Graphics.FontDefinition, text as Lang.String, width as Lang.String) as Graphics.FontDefinition{
+		function adjustFont(dc as Graphics.Dc, baseFont as Graphics.FontDefinition, text as String, width as Numeric) as Graphics.FontDefinition{
 			// This function will decrease the font until the text fits in the available width
 			var fontMin =
 				(baseFont <= Graphics.FONT_NUMBER_THAI_HOT) ? Graphics.FONT_XTINY :

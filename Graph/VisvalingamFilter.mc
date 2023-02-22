@@ -5,32 +5,29 @@ using MyModule.MyMath;
 module MyModule{
 	(:Graph)
 	module Graph{
-		class VisvalingamFilter extends Math.Filter{
-			var maxCount = null; // This amount is handy for the Dc.fillPolygon(pts) function with max 64 points
-			var minInfluence as Float = 0;
-			protected var pts as Array;
-
-			protected var lastIndex as Number;
-			protected var surfaces as Array;
+		class VisvalingamFilter // extends Math.Filter
+		{
+			var maxCount as Number? = null; // This amount is handy for the Dc.fillPolygon(pts) function with max 64 points
+			var minInfluence as Decimal = 0.0f;
 
 			function initialize(options as { 
-				:maxCount as Number or Null,
-				:minInfluence as Float or Null,
+				:maxCount as Number,
+				:minInfluence as Decimal,
 			}){
-				Filter.initialize(options);
+				//Filter.initialize(options);
 				if(options.hasKey(:maxCount)){
-					maxCount = options.get(:maxCount);
+					maxCount = options.get(:maxCount) as Number;
 					// Less then 3 points is meaningless
 					if(maxCount < 3){
 						maxCount = 3;
 					}
 				}
 				if(options.hasKey(:minInfluence)){
-					minInfluence = options.get(:minInfluence);
+					minInfluence = options.get(:minInfluence) as Decimal;
 				}
 			}
 
-			function apply(pts as Lang.Array){
+			function apply(pts as Array<Array< Numeric> >) as Void {
 				// Loop through points and calculate the area of a triangle with his neighbour points
 				// The size of the triangle will indicate if the point is important => the smallest value will be removed (and recalculate its neighbours) 
 				// until the given amount of points will remain.
@@ -58,8 +55,8 @@ module MyModule{
 				// Now remove the smallest surfaces untill the number of points equals maxCount
 				if(maxCount != null){
 					while(size > 2){
-						var minValue = MyMath.min(surfaces);
-						if(size > maxCount){
+						var minValue = MyMath.min(surfaces as Array<Numeric>);
+						if(size > maxCount as Number){
 							var i = surfaces.indexOf(minValue) + 1;
 							var pt = pts[i];
 							pts.remove(pt);
@@ -84,7 +81,7 @@ module MyModule{
 				}
 			}
 
-			protected function getTriangleSurface(pt1, pt2, pt3){
+			hidden function getTriangleSurface(pt1 as Array<Numeric>, pt2 as Array<Numeric>, pt3 as Array<Numeric>) as Numeric{
 				return MyMath.abs(0.5 * (pt1[0] * pt2[1] + pt2[0] * pt3[1] + pt3[0] * pt1[1] - pt1[0] * pt3[1] - pt2[0] * pt1[1] - pt3[0] * pt2[1]));
 			}
 		}
