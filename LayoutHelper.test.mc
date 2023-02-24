@@ -3,21 +3,7 @@ using Toybox.System;
 using Toybox.Math;
 import Toybox.Lang;
 using MyModule.Layout;
-
-function arrayToExcel(array as Array<Numeric>) as String{
-	var delimiter = (9).toChar();
-	var decimal_separator = ",";
-	var result = "";
-	for(var i = 0; i < array.size(); i++){
-		var str = array[i].toString();
-		var found = str.find(".");
-		if(found != null){
-			str = str.substring(0, found) + decimal_separator + str.substring(found+1, str.length());
-		}
-		result += (i==0) ? str : delimiter + str;
-	}
-	return result;
-}
+using MyModule.MyMath;
 
 (:test)
 function layoutHelper_getAreaByRatio(logger as Logger) as Boolean{
@@ -78,10 +64,25 @@ function layoutHelper_getAreaByRatio(logger as Logger) as Boolean{
 								var yMin2 = yMin_ * yMin_;
 								var yMax2 = yMax_ * yMax_;
 
+								// check if boundaries are ok
 								if(xMin2 + yMin2 > radius2){ errorMessages.add("Outside circle (bottom-left)"); }
 								if(xMin2 + yMax2 > radius2){ errorMessages.add("Outside circle (top-left)"); }
 								if(xMax2 + yMax2 > radius2){ errorMessages.add("Outside circle (top-right)"); }
 								if(xMax2 + yMin2 > radius2){ errorMessages.add("Outside circle (bottom-right)"); }
+
+								// check if the maximum space is used
+								var quality = 0;
+								if(xMax == xMax_) { quality += 1.25; }
+								if(xMin == xMin_) { quality += 1.25; }
+								if(yMax == yMax_) { quality += 1.25; }
+								if(yMin == yMin_) { quality += 1.25; }
+								if(MyMath.abs(xMax2 + yMax2 - radius2)/radius <= 2){ quality += 1.5; }
+								if(MyMath.abs(xMin2 + yMax2 - radius2)/radius <= 2){ quality += 1.5; }
+								if(MyMath.abs(xMin2 + yMin2 - radius2)/radius <= 2){ quality += 1.5; }
+								if(MyMath.abs(xMax2 + yMin2 - radius2)/radius <= 2){ quality += 1.5; }
+								if(quality < 4){
+									errorMessages.add("The size of the area should be increased (quality="+quality+")");
+								}
 
 								if(errorMessages.size() > 0){
 									System.println(infoRatio);
