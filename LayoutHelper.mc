@@ -17,11 +17,11 @@ module MyModule{
 			}
 		}
 
-		enum AlignDirection {
-			ALIGN_LEFT = 1,
-			ALIGN_RIGHT = 2,
-			ALIGN_TOP = 4,
-			ALIGN_BOTTOM = 8
+		enum Direction {
+			LEFT = 1,
+			RIGHT = 2,
+			TOP = 4,
+			BOTTOM = 8,
 		}
 
 		enum Quadrant {
@@ -57,7 +57,8 @@ module MyModule{
 				yMax = yOffset - locY;
 				yMin = yOffset - (locY + height);
 			}
-			static function create(xMin as Numeric, yMin as Numeric, xMax as Numeric, yMax as Numeric) as Area{
+			static function create(xMin as Numeric, xMax as Numeric, yMin as Numeric, yMax as Numeric) as Area{
+				// creates an area based upon the coordinate system with the center of the circle as point (0,0)
 				var area = new Area(0,0,0,0);
 				area.xMin = xMin;
 				area.yMin = yMin;
@@ -66,11 +67,19 @@ module MyModule{
 				return area;
 			}
 
-			function clone() as Area{ return Area.create(xMin, yMin, xMax, yMax); }
+			function clone() as Area{ return Area.create(xMin, xMax, yMin, yMax); }
 			function locX() as Numeric{ return xMin + xOffset; }
 			function locY() as Numeric { return yOffset - yMax; }
 			function width() as Numeric{ return xMax - xMin; }
 			function height() as Numeric{ return yMax - yMin; }
+			function roundToInt() as Void{
+				// round down all coordinates to integers
+				xMin = Math.ceil(xMin).toNumber();
+				xMax = Math.floor(xMax).toNumber();
+				yMin = Math.ceil(yMin).toNumber();
+				yMax = Math.floor(yMax).toNumber();
+			}
+
 			function rotateToNextQuadrant() as Void{
 				var xMin = self.xMin;
 				self.xMin = -yMax;
@@ -114,25 +123,23 @@ module MyModule{
 					// shrink width
 					var width = h * ratio;
 					var dx = 0.5f * (w - width);
-					System.println("dx = " + dx);
-					return Area.create(boundaries.xMin + dx, boundaries.yMin, boundaries.xMax - dx, boundaries.yMax);
+					return Area.create(boundaries.xMin + dx, boundaries.xMax - dx, boundaries.yMin, boundaries.yMax);
 				}else if(r < ratio){
 					// shrink height
 					var height = w / ratio;
 					var dy = 0.5f * (h - height);
-					System.println("dy = " + dy);
-					return Area.create(boundaries.xMin, boundaries.yMin + dy, boundaries.xMax, boundaries.yMax - dy);
+					return Area.create(boundaries.xMin, boundaries.xMax, boundaries.yMin + dy, boundaries.yMax - dy);
 				}else{
 					// already has requested ratio
 					return boundaries.clone();
 				}
 			}
 
-			function setAreaAligned(boundaries as Area, area as Area, alignment as AlignDirection|Number) as Void{
-				var left = (alignment & ALIGN_LEFT) > 0;
-				var right = (alignment & ALIGN_RIGHT) > 0;
-				var top = (alignment & ALIGN_TOP) > 0;
-				var bottom = (alignment & ALIGN_BOTTOM) > 0;
+			function setAreaAligned(boundaries as Area, area as Area, alignment as Direction|Number) as Void{
+				var left = (alignment & LEFT) > 0;
+				var right = (alignment & RIGHT) > 0;
+				var top = (alignment & TOP) > 0;
+				var bottom = (alignment & BOTTOM) > 0;
 
 				// horizontal alignment
 				var dx = (left && !right) ? area.xMin - boundaries.xMin // align left
@@ -159,672 +166,220 @@ module MyModule{
 				LayoutHelper.initialize();
 			}
 
-			function setAreaAligned(boundaries as Area, area as Area, alignment as AlignDirection|Number) as Void{
+			function setAreaAligned(boundaries as Area, area as Area, alignment as Direction|Number) as Void{
 				LayoutHelper.setAreaAligned(boundaries, area, alignment);
 			}
 
 			function getAreaWithRatio(boundaries as Area, ratio as Float) as Area|Null {
-				// check in which quadrants the space (=boundaries) is in
+				var xMin = boundaries.xMin;
+				var xMax = boundaries.xMax;
+				var yMin = boundaries.yMin;
+				var yMax = boundaries.yMax;
+				var area = null;
+
+				// check if which quadrants the boundaries are outside the circle
+				//                          ┌─────────┐
+				//	                     ┌──┘    ·    └──┐  
+				//	                   ┌─┘       ·       └─┐
+				//	                   │      Q2 · Q1      │
+				//	                   │ · · · · + · · · · │
+				//	                   │      Q3 · Q4      │
+				//	                   └─┐       ·       ┌─┘
+				//	                     └──┐    ·    ┌──┘
+				//	                        └─────────┘
+
+				var r2 = radius*radius;
+
+				var xMin2 = xMin*xMin;
+				var xMax2 = xMax*xMax;
+				var yMin2 = yMin*yMin;
+				var yMax2 = yMax*yMax;
+
 				var quadrants = 0;
-				if(boundaries.yMax > 0){
-					if(boundaries.xMax > 0){
-						quadrants |= QUADRANT_TOP_RIGHT;
-					}
-					if(boundaries.xMin < 0){
-						quadrants |= QUADRANT_TOP_LEFT;
-					}
+
+				// top right corner in quadrant 1
+				if((xMax2 + yMax2 > r2) && (xMax > 0) && (yMax > 0)){
+					quadrants |= QUADRANT_TOP_RIGHT;
 				}
-				if(boundaries.yMin < 0){
-					if(boundaries.xMax > 0){
-						quadrants |= QUADRANT_BOTTOM_RIGHT;
-					}
-					if(boundaries.xMin < 0){
-						quadrants |= QUADRANT_BOTTOM_LEFT;
-					}
+				// top left corner in quadrant 2
+				if((xMin2 + yMax2 > r2) && (xMin < 0) && (yMax > 0)){
+					quadrants |= QUADRANT_TOP_LEFT;
+				}
+				// bottom left corner in quadrant 3
+				if((xMin2 + yMin2 > r2) && (xMin < 0) && (yMin < 0)){
+					quadrants |= QUADRANT_BOTTOM_LEFT;
+				}
+				// bottom right corner in quadrant 4
+				if((xMax2 + yMin2 > r2) && (xMax > 0) && (yMin < 0)){
+					quadrants |= QUADRANT_BOTTOM_RIGHT;
+				}
+
+				// No quadrants reached -> return the full area
+				if(quadrants == 0){
+					area = boundaries.clone();
+					area.roundToInt();
+					return area;
 				}
 
 				// check if the circle edge can be reached with all 4 corners
-				if(quadrants == QUADRANT_TOP_RIGHT | QUADRANT_TOP_LEFT | QUADRANT_BOTTOM_RIGHT | QUADRANT_BOTTOM_LEFT){
-					System.println("4 corners");
-
-					// this functions returns 2 Float values: xMax, yMax which indicate the top left corner of the found rectangle with given ratio
-					//         radius   ↑      ┌─────────┐
-					//	(from center)   ·    ┌─○· · · · ·○─┐   ↑ yMax (from vertical center)
-					//	                ·  ┌─┘ ·         · └─┐ · 
-					//	                ·  │   ·         ·   │ ·
-					//	                ─  │   ·    +    ·   │ ─
-					//	                   │   ·         ·   │ 
-					//	                   └─┐ ·         · ┌─┘
-					//	                     └─○· · · · ·○─┘
-					//	                       └─────────┘
-					//                         <----|---->
-					//	                      -xMax | xMax  (from horizontal center)
-			
-					//	formula1:	radius² = x² + y²
-					//		=> radius² = xMax² + yMax²
-					//
-					//	formula2: ratio = width / height
-					//		=> ratio = (2 * xMax) / (2 * yMax)
-					//		=> ratio = xMax / yMax
-					//		=> xMax = ratio * yMax
-					//
-					//	radius² = (ratio * yMax)² + yMax²
-					//	radius² = ratio² * yMax² + yMax²
-					//	radius² = (ratio² + 1) * yMax²
-					//	yMax² = radius² / (ratio² + 1)
-					//	yMax = √(radius² / (ratio² + 1))
-
-					var yMax = Math.sqrt(radius*radius / (ratio*ratio + 1));
-					var xMax = ratio * yMax;
-					var yMin = -yMax;
-					var xMin = -xMax;
-
-					// check boundaries with found area
-					var area = Area.create(xMin, yMin, xMax, yMax);
-					var exceeded_quadrants = checkBoundaries(boundaries, area);
-					if(exceeded_quadrants == 0){
-						return area;
-					}else{
-						quadrants &= ~exceeded_quadrants;
-					}
-				}
-
-				// No sollution yet......
-				// check if the circle edge can be reached with 2 corners
-				// 2 neighboured quadrants must be left
-				var direction = 0;
-				if((quadrants & QUADRANT_TOP_LEFT) > 0){
-					if((quadrants & QUADRANT_TOP_RIGHT) > 0){
-						direction = ALIGN_TOP;
-					}else if((quadrants & QUADRANT_BOTTOM_LEFT) > 0){
-						direction = ALIGN_LEFT;
-					}
-				}else if((quadrants & QUADRANT_BOTTOM_RIGHT) > 0){
-					if((quadrants & QUADRANT_TOP_RIGHT) > 0){
-						direction = ALIGN_RIGHT;
-					}else if((quadrants & QUADRANT_BOTTOM_LEFT) > 0){
-						direction = ALIGN_BOTTOM;
-					}
-				}
-
-				if(direction != 0){
-					System.println("2 corners, direction = " + direction + ", quadrants = " + quadrants);
-					// change to uniform direction top, for generic calculations
-					var ratio_ = ratio;
-					var offset = boundaries.yMin;
-					if(direction == ALIGN_BOTTOM){
-						offset = -boundaries.yMax;
-					}else if(direction == ALIGN_LEFT){
-						offset = -boundaries.xMax;
-						ratio_ = 1/ratio;
-					}else if(direction == ALIGN_RIGHT){
-						offset = boundaries.xMin;
-						ratio_ = 1/ratio;
-					}
-
-					// this functions returns 2 Float values: max and range
-					//		max: the distance from the center to the outer rectangel side
-					//		range: the distance from the center to both sides of the rectangle
-					//
-					//         radius   ↑      ┌─────────┐
-					//	(from center)   ·    ┌─○· · · · ·○─┐   ↑ max (from vertical center)
-					//	                ·  ┌─┘ ·         · └─┐ · 
-					//	                ·  │   ·         ·   │ ·
-					//	                ─  │   ·    +    ·   │ ─
-					//	                   │---• · · · · •---│ ↓ offset (from vertical center)
-					//	                   └─┐             ┌─┘
-					//	                     └─┐         ┌─┘
-					//	                       └─────────┘
-					//       						       <----|---->
-					//	                     -range | +range  (from horizontal center)
-					//	                       <--------->
-					//                          2 * range
-			
-					//	formula1:	radius² = x² + y²
-					//		radius² = range² + max²
-					//	formula2: ratio = width / height
-					//		ratio = 2*range / (max - offset)
-					//	=> range = ratio * (max - offset) / 2
-			
-					//	combine: radius² = range² + max² AND range = ratio * (max - offset) / 2
-					//	=> radius² = (ratio * (max - offset) / 2)² + max²
-					//	use abc formula where max is the value to be calculated: (all other variables are known)
-					//	=> (ratio/2 * (max - offset))² + max² - radius² = 0
-					//	=> (ratio/2 * max - ratio/2*offset)² + max² - radius² = 0
-					//	=> (ratio/2)² * max² -2 * ratio/2 * max * ratio/2*offset + (ratio/2*offset)² + max² - radius² = 0
-					//	=> (1+(ratio/2)²) * max² + (-2 * ratio/2 * ratio/2*offset) * max + (ratio/2*offset)² - radius² = 0
-					//	=>	a = 1+(ratio/2)²
-					//			b = -2 * ratio/2 * ratio/2 * offset = -ratio²/2 * offset
-					//			c = (ratio/2*offset)² - radius²
-					//	=>	D = b² - 4*a*c
-					//	=>	max = (-b ± √D)/(2 * a)
-
-					var a = 1+Math.pow(ratio_/2, 2);
-					var b = -ratio_*ratio_/2 * offset;
-					var c = Math.pow(ratio_/2 * offset, 2) - radius*radius;
-					var results = MyMath.getAbcFormulaResults(a, b, c);
-					var yMax = results[1];
-					var yMin = offset;
-					var xMax = ratio_ * (yMax - yMin) / 2;
-					var xMin = -xMax;
-
-					var area = Area.create(xMin, yMin, xMax, yMax);
-
-					// change back to original direction
-					if(direction == ALIGN_BOTTOM){
-						area.flipVertical();
-					}else if(direction == ALIGN_LEFT){
-						area.rotateToNextQuadrant();
-					}else if(direction == ALIGN_RIGHT){
-						area.rotateToPreviousQuadrant();
-					}
+				if(quadrants == (QUADRANT_TOP_RIGHT|QUADRANT_TOP_LEFT|QUADRANT_BOTTOM_LEFT|QUADRANT_BOTTOM_RIGHT)){
+					area = reachCircleEdge_4Points(radius, ratio);
 
 					// check boundaries
 					var exceeded_quadrants = checkBoundaries(boundaries, area);
-					if(exceeded_quadrants == 0){
-						return area;
+					if(exceeded_quadrants != 0){
+						//quadrants &= ~exceeded_quadrants;
 					}else{
-						quadrants &= ~exceeded_quadrants;
+						area.roundToInt();
+						return area;
 					}
 				}
 
-				// No sollution yet......
-				// Check if edge of circle can be reached at 1 corner
+				var quadrantCount = MyMath.getBitsHigh(quadrants);
+				if(quadrantCount > 1){
+					// No sollution yet......
+					// check if the circle edge can be reached with 2 corners
+					// collect in which directions the circle can be reached
+					var directions = 0;
+
+					if((quadrants & QUADRANT_TOP_LEFT) > 0){
+						if((quadrants & QUADRANT_TOP_RIGHT) > 0){
+							directions |= TOP;
+						}
+						if((quadrants & QUADRANT_BOTTOM_LEFT) > 0){
+							directions |= LEFT;
+						}
+					}
+					if((quadrants & QUADRANT_BOTTOM_RIGHT) > 0){
+						if((quadrants & QUADRANT_TOP_RIGHT) > 0){
+							directions |= RIGHT;
+						}
+						if((quadrants & QUADRANT_BOTTOM_LEFT) > 0){
+							directions |= BOTTOM;
+						}
+					}
+
+					// Choose direction from opposite directions
+					if(directions & (LEFT|RIGHT) == (LEFT|RIGHT)){
+						if(boundaries.xMin + boundaries.xMax > 0){
+							directions &= ~LEFT;
+						}else{
+							directions &= ~RIGHT;
+						}
+					}
+					if(directions & (TOP|BOTTOM) == (TOP|BOTTOM)){
+						if(boundaries.yMin + boundaries.yMax > 0){
+							directions &= ~BOTTOM;
+						}else{
+							directions &= ~TOP;
+						}
+					}
+
+					var directionsArray = MyMath.getBitValues(directions);
+					for(var i=0; i<directionsArray.size(); i++){
+						var direction = directionsArray[i] as Direction;
+						area = reachCircleEdge_2Points(radius, boundaries, ratio, direction);
+
+						// check boundaries
+						var exceeded_quadrants = checkBoundaries(boundaries, area);
+						if(exceeded_quadrants > 0){
+							// quadrants &= ~exceeded_quadrants;
+						}else{
+							area.roundToInt();
+							return area;
+						}
+					}
+				}
+
 				if(quadrants > 0){
-					System.println("single corner, quadrants: " + quadrants);
+					// No sollution yet......
+					// Check if edge of circle can be reached at 1 corner
 
-					// transpose align direction to QUADRANT_TOP_RIGHT
-					var xOffset = boundaries.xMin;
-					var yOffset = boundaries.yMin;
-					if((quadrants & QUADRANT_BOTTOM_RIGHT) > 0){
-						// flip vertical
-						yOffset = -boundaries.yMax;
-					}else if((quadrants & QUADRANT_TOP_LEFT) > 0){
-						// flip horizontal
-						xOffset = -boundaries.xMax;
-					}else if((quadrants & QUADRANT_BOTTOM_LEFT) > 0){
-						// flip horizontal + vertical
-						xOffset = -boundaries.xMax;
-						yOffset = -boundaries.yMax;
+					// reduce quadrants (remove quadrants with smallest space within boundaries)
+					var quadrant = quadrants;
+					quadrantCount = MyMath.getBitsHigh(quadrant);
+					if(quadrantCount > 1){
+						var removed_quadrants = 0;
+						if(quadrants & QUADRANT_TOP_RIGHT > 0){
+							if(quadrants & QUADRANT_TOP_LEFT > 0){
+								if(boundaries.xMin+boundaries.xMax > 0){
+									removed_quadrants |= QUADRANT_TOP_LEFT;
+								}else{
+									removed_quadrants |= QUADRANT_TOP_RIGHT;
+								}
+							}
+							if(quadrants & QUADRANT_BOTTOM_RIGHT > 0){
+								if(boundaries.yMin+boundaries.yMax > 0){
+									removed_quadrants |= QUADRANT_BOTTOM_RIGHT;
+								}else{
+									removed_quadrants |= QUADRANT_TOP_RIGHT;
+								}
+							}
+						}
+						if(quadrants & QUADRANT_BOTTOM_LEFT > 0){
+							if(quadrants & QUADRANT_BOTTOM_RIGHT > 0){
+								if(boundaries.xMin+boundaries.xMax > 0){
+									removed_quadrants |= QUADRANT_BOTTOM_LEFT;
+								}else{
+									removed_quadrants |= QUADRANT_BOTTOM_RIGHT;
+								}
+							}
+							if(quadrants & QUADRANT_TOP_LEFT > 0){
+								if(boundaries.yMin+boundaries.yMax > 0){
+									removed_quadrants |= QUADRANT_BOTTOM_LEFT;
+								}else{
+									removed_quadrants |= QUADRANT_TOP_LEFT;
+								}
+							}
+						}
+						quadrant &= ~removed_quadrants;
 					}
-
-					// this functions returns 2 Float values: xMax, yMax which indicate the top left corner of the found rectangle with given ratio
-					//         radius   ↑      ┌─┬───────┐
-					//	(from center)   ·    ┌─┘ •· · · ·○─┐   ↑ yMax (from vertical center)
-					//	                ·  ┌─┘   │       · └─┐ · 
-					//	                ·  │     │       ·   │ ·
-					//	                ─  │     │  +    ·   │ ─
-					//	                   │     •───────•───│ ↓ yOffset (from vertical center)
-					//	                   └─┐             ┌─┘
-					//	                     └─┐         ┌─┘
-					//	                       └─────────┘
-					//       						         <--|---->
-					//	                     xOffset| xMax  (from horizontal center)
-					//
-					//	xOffset -> x
-					//	yOffset -> y
-					//	radius -> r
-					//	ratio -> C
-					//
-					//	(x+w)²+(y+h)²=r²
-					//	h=w/C	→	(x+w)²+(y+w/C)²=r²	
-					//	(x²+2wx+w²) + (y²+(2y/C)w+(1/C²)w²) = r²
-					//	(1+1/C²)*w² + (2x+2y/C)*w + (x²+y²-r²) = 0
-					//
-					//	w? -> use abc formula where w->x
-					//
-					//	ax² + bx + c = 0
-					//
-					//	a = (1+1/C²)
-					//	b = (2x+2y/C)
-					//	c = (x²+y²-r²)
-
-					var a = 1 + 1/(ratio*ratio);
-					var b = 2 * xOffset + 2 * yOffset / ratio;
-					var c = xOffset * xOffset + yOffset * yOffset - radius * radius;
-					var results = MyMath.getAbcFormulaResults(a, b, c);
-					var w = MyMath.max(results); // use the positive result
-					var h = w / ratio;
-					var yMax = yOffset + h;
-					var xMax = xOffset + w;
-					var yMin = yOffset;
-					var xMin = xOffset;
-					var area = Area.create(xMin, yMin, xMax, yMax);
-
-					// transpose back to original orientation
-					if((quadrants & QUADRANT_BOTTOM_RIGHT) > 0){
-						area.flipVertical();
-					}else if((quadrants & QUADRANT_TOP_LEFT) > 0){
-						area.flipHorizontal();
-					}else if((quadrants & QUADRANT_BOTTOM_LEFT) > 0){
-						area.flipHorizontal();
-						area.flipVertical();
-					}
-					System.println("temp result: " + area);
+					area = reachCircleEdge_1Point(radius, boundaries, ratio, quadrant);
 
 					// check boundaries
 					var exceeded_quadrants = checkBoundaries(boundaries, area);
 					if(exceeded_quadrants == 0){
+						area.roundToInt();
 						return area;
-					}else{
-						quadrants &= ~exceeded_quadrants;
 					}
 				}
+
+				if(quadrants > 0){
+					// shrink to fit within boundaries (ratio only to determine shrink and grow direction)
+					if(area != null){
+						shrinkAndResize(area, radius, boundaries, quadrants);
+						area.roundToInt();
+						return area;
+					}
+				}
+
 				// No restrictions for the edge found
-				System.println("no edges, only boundaries, quadrants: " + quadrants);
 				return LayoutHelper.getAreaWithRatio(boundaries, ratio);
 			}
 
 			private function checkBoundaries(boundaries as Area, area as Area) as Quadrant|Number{
 				// this number results with the quadrants in which the limits are exceeded
 				var quadrants_exceeded = 0;
-				if(area.xMin < boundaries.xMin - 0.01){ quadrants_exceeded |= (QUADRANT_TOP_LEFT | QUADRANT_BOTTOM_LEFT); }
-				if(area.xMax > boundaries.xMax + 0.01){ quadrants_exceeded |= (QUADRANT_TOP_RIGHT | QUADRANT_BOTTOM_RIGHT); }
-				if(area.yMin < boundaries.yMin - 0.01){ quadrants_exceeded |= (QUADRANT_BOTTOM_LEFT | QUADRANT_BOTTOM_RIGHT); }
-				if(area.yMax > boundaries.yMax + 0.01){ quadrants_exceeded |= (QUADRANT_TOP_LEFT | QUADRANT_TOP_RIGHT); }
-				if(quadrants_exceeded > 0){
-					System.println(Lang.format("Failed Result: $1$, exceeded quadrants: $2$", [area, quadrants_exceeded]));
+				if(area.xMin < boundaries.xMin){
+					if(area.yMax > 0) { quadrants_exceeded |= QUADRANT_TOP_LEFT; }
+					if(area.yMin < 0) { quadrants_exceeded |= QUADRANT_BOTTOM_LEFT; }
+				}
+				if(area.xMax > boundaries.xMax){
+					if(area.yMax > 0) { quadrants_exceeded |= QUADRANT_TOP_RIGHT; }
+					if(area.yMin < 0) { quadrants_exceeded |= QUADRANT_BOTTOM_RIGHT; }
+				}
+				if(area.yMax > boundaries.yMax){
+					if(area.xMax > 0) { quadrants_exceeded |= QUADRANT_TOP_RIGHT; }
+					if(area.xMin < 0) { quadrants_exceeded |= QUADRANT_TOP_LEFT; }
+				}
+				if(area.yMin < boundaries.yMin){
+					if(area.xMax > 0) { quadrants_exceeded |= QUADRANT_BOTTOM_RIGHT; }
+					if(area.xMin < 0) { quadrants_exceeded |= QUADRANT_BOTTOM_LEFT; }
 				}
 				return quadrants_exceeded;
 			}
-		}
-/*
-		class LayoutHelper{
-			enum Alignment {
-				ALIGN_TOP = 1,
-				ALIGN_BOTTOM = 2,
-				ALIGN_LEFT = 3,
-				ALIGN_RIGHT = 4,
-			}
-		
-			hidden var deviceSettings as DeviceSettings;
-			hidden var radius as Float;
-			hidden var xMin as Float = 0.0f;
-			hidden var xMax as Float = 0.0f;
-			hidden var yMin as Float = 0.0f;
-			hidden var yMax as Float = 0.0f;
-		
-			function initialize(boundaries as {	:x as Numeric, :y as Numeric, :width as Numeric, :heigth as Numeric} or Null ){
-				self.deviceSettings = System.getDeviceSettings();
-				self.radius = 0.5f * MyMath.max([deviceSettings.screenHeight, deviceSettings.screenWidth]  as Array<Number>).toFloat();
-		
-				if(boundaries != null){
-					var x = boundaries.hasKey(:x) ? boundaries.get(:x) as Numeric : 0;
-					var y = boundaries.hasKey(:y) ? boundaries.get(:y) as Numeric : 0;
-					var w = boundaries.hasKey(:width) ? boundaries.get(:width) as Numeric : deviceSettings.screenWidth - x;
-					var h = boundaries.hasKey(:height) ? boundaries.get(:height) as Numeric : deviceSettings.screenHeight - y;
-					setBoundaries(x, y, w, h);
-				}else{
-					setBoundaries(0, 0, deviceSettings.screenWidth, deviceSettings.screenHeight);
-				}
-			}
-		
-			function setBoundaries(x as Numeric, y as Numeric, w as Numeric, h as Numeric) as Void{
-				self.xMin = (x - self.radius).toFloat();
-				self.xMax = (x + w - self.radius).toFloat();
-				self.yMin = (self.radius - (y + h)).toFloat();
-				self.yMax = (self.radius - y).toFloat();
-			}
 
-			function getBoundaries() as Array<Numeric>{
-				return [
-					xMin + radius, // x
-					yMin + radius, // y
-					xMax - xMin, // width
-					yMax - yMin, // height
-				] as Array<Numeric>;
-			}
-
-			function getAreaByRatio(ratio as Float) as Array<Number> or Null{
-				// not ok untill ok is proven
-				var ok = false;
-				// placeholders  for final result
-				var xMaxC = null;
-				var xMinC = null;
-				var yMaxC = null;
-				var yMinC = null;
-				
-				// Check if the screen is circle shaped, otherwise the area is easier to calculate
-				if(deviceSettings.screenShape == System.SCREEN_SHAPE_ROUND){
-					// use x,y values based upon the circle center point x→ y↑
-		
-					// check where the edge could go outside the circle
-					//           ―――――
-					//        │ q2 │ q1 │
-					//        ├────┼────┤
-					//        │ q3 │ q4 │
-					//          ───────
-		
-					var q1 = (yMax > 0) && (xMax > 0);
-					var q2 = (yMax > 0) && (xMin < 0);
-					var q3 = (yMin < 0) && (xMin < 0);
-					var q4 = (yMin < 0) && (xMax > 0);
-		
-					if(q1 && q2 && q3 && q4){
-						// All quadrants -> calculate rectangle in all quadrants -> calculate rectangle with given ratio that will touch the cirle edge at all corners
-						var results = getLimitsForRatio_4Corners(ratio as Float, radius as Float);
-			
-						// determine the x,y based upon circle edge:
-						xMaxC = results.get(:xMax) as Float;
-						xMinC = -xMaxC;
-						yMaxC = results.get(:yMax) as Float;
-						yMinC = -yMaxC;
-			
-						// Check if these circle edge values are within the limits
-						ok = true;
-						if(xMaxC > xMax) { ok = false; q1 = false; q4 = false; }
-						if(xMinC < xMin) { ok = false; q2 = false; q3 = false; }
-						if(yMaxC > yMax) { ok = false; q1 = false; q2 = false; }
-						if(yMinC < yMin) { ok = false; q3 = false; q4 = false; }
-					}
-			
-					if(!ok){
-						ok = true;
-						if(q1 && q2){
-							// determine the bigest rectangle with given ratio within a circle (top)
-							var result = getLimitsForRatio_2Corners(ratio, yMin, radius);
-			
-							// determine the x,y based upon these results for given quadrants
-							yMaxC = result.get(:max) as Float;
-							yMinC = yMin;
-
-							// Check max limit
-							if(yMaxC > yMax){
-								yMaxC = yMax;
-								xMaxC = Math.sqrt(radius*radius - yMax*yMax);
-							}else{
-								xMaxC = result.get(:range) as Float;
-							}
-							xMinC = -xMaxC;
-
-						}else if(q3 && q4){
-							// determine the bigest rectangle with given ratio within a circle (top)
-							var result = getLimitsForRatio_2Corners(ratio, -yMax, radius);
-			
-							// determine the x,y based upon these results for given quadrants
-							yMinC = -(result.get(:max) as Float);
-							yMaxC = yMax;
-
-							// Check max limit
-							if(yMinC < yMin){
-								yMinC = yMin;
-								xMaxC = Math.sqrt(radius*radius - yMin*yMin);
-							}else{
-								xMaxC = result.get(:range) as Float;
-							}
-							xMinC = -xMaxC;
-
-
-						}else if(q1 && q4){
-							// determine the bigest rectangle with given ratio within a circle (top)
-							var result = getLimitsForRatio_2Corners(1/ratio, xMin, radius);
-			
-							// determine the x,y based upon these results for given quadrants
-							xMaxC = result.get(:max) as Float;
-							xMinC = xMin;
-
-							// Check max limit
-							if(xMaxC > xMax){
-								xMaxC = xMax;
-								yMaxC = Math.sqrt(radius*radius - xMax*yMax);
-							}else{
-								yMaxC = result.get(:range) as Float;
-							}
-							yMinC = -yMaxC;
-
-						}else if(q2 && q3){
-							// determine the bigest rectangle with given ratio within a circle (top)
-							var result = getLimitsForRatio_2Corners(1/ratio, -xMax, radius);
-			
-							// determine the x,y based upon these results for given quadrants
-							xMinC = -(result.get(:max) as Float);
-							xMaxC = xMax;
-
-							if(xMinC < xMin){
-								xMinC = xMin;
-								yMaxC = Math.sqrt(radius*radius - xMin*xMin);
-							}else{
-								yMaxC = result.get(:range) as Float;
-							}
-							yMinC = -yMaxC;
-
-						}else{
-							ok = false;
-						}
-			
-						// Check if the calculated circle edge values are within the given limits
-						if(ok){
-							if(yMaxC as Float > yMax) { ok = false; q1 = false; q2 = false;}
-							if(yMinC as Float < yMin) { ok = false; q3 = false; q4 = false;}
-							if(xMaxC as Float > xMax) { ok = false; q1 = false; q4 = false;}
-							if(xMinC as Float < xMin) { ok = false; q2 = false; q3 = false;}
-						}
-					}
-		
-					if(!ok){
-						ok = true;
-						// Now check if the rectangle is limited at a single corner
-						if(q1){
-							//	q1 =>
-							var results = getLimitsForRatio_1Corner(ratio as Float, xMin as Float, yMin as Float, radius as Float);
-			
-							// determine the x,y for this quadrant
-							yMaxC = results.get(:yMax) as Float;
-							xMaxC = results.get(:xMax) as Float;
-							xMinC = xMin;
-							yMinC = yMin;
-						}else if(q2){
-							//	q2 =>
-							var results = getLimitsForRatio_1Corner(ratio as Float, -xMax as Float, yMin as Float, radius as Float);
-			
-							// determine the x,y for this quadrant
-							yMinC = yMin;
-							yMaxC = results.get(:yMax) as Float;
-							xMinC = -(results.get(:xMax) as Float);
-							xMaxC = xMax;
-						}else if(q3){
-							//	q3 =>
-							var results = getLimitsForRatio_1Corner(ratio as Float, -xMax as Float, -yMax as Float, radius as Float);
-			
-							// determine the x,y for this quadrant
-							yMinC = -(results.get(:yMax) as Float);
-							yMaxC = yMax;
-							xMinC = -(results.get(:xMax) as Float);
-							xMaxC = xMax;
-						}else if(q4){
-							//	q4 =>
-							var results = getLimitsForRatio_1Corner(ratio as Float, xMin as Float, -yMax as Float, radius as Float);
-			
-							// determine the x,y for this quadrant
-							yMinC = -(results.get(:yMax) as Float);
-							yMaxC = yMax;
-							xMinC = xMin;
-							xMaxC = results.get(:xMax) as Float;
-						}else{
-							ok = false;
-						}
-						// Check if the calculated circle edge values are within the given limits
-						if(ok){
-							if(yMaxC as Float > yMax) {
-								yMaxC = yMax;
-								if(q1){
-									xMaxC = Math.sqrt(radius*radius - yMax*yMax);
-								}else if(q2){
-									xMinC = - Math.sqrt(radius*radius - yMax*yMax);
-								}
-							}
-							if(yMinC as Float < yMin) {
-								yMinC = yMin;
-								if(q4){
-									xMaxC = Math.sqrt(radius*radius - yMin*yMin);
-								}else if(q3){
-									xMinC = - Math.sqrt(radius*radius - yMin*yMin);
-								}
-							}
-							if(xMaxC as Float > xMax) {
-								xMaxC = xMax;
-								if(q1){
-									yMaxC = Math.sqrt(radius*radius - xMax*xMax);
-								}else if(q4){
-									yMinC = - Math.sqrt(radius*radius - xMax*xMax);
-								}
-							}
-							if(xMinC as Float < xMin) {
-								xMinC = xMin;
-								if(q2){
-									yMaxC = Math.sqrt(radius*radius - xMin*xMin);
-								}else if(q3){
-									yMinC = - Math.sqrt(radius*radius - xMin*xMin);
-								}
-							}
-						}
-					}
-				}
-
-				if(!ok){
-					xMinC = xMin;
-					xMaxC = xMax;
-					yMinC = yMin;
-					yMaxC = yMax;
-					ok = true;
-				}
-
-				// convert to real xy coordinates:
-				var x1 = Math.ceil((xMinC as Float) + radius).toNumber();
-				var x2 = Math.floor((xMaxC as Float) + radius).toNumber();
-				var y1 = Math.ceil(radius - (yMaxC as Float)).toNumber();
-				var y2 = Math.floor(radius - (yMinC as Float)).toNumber();
-				var w = x2 - x1;
-				var h = y2 - y1;
-
-				if(w<0 || h<0){
-					return null;
-				}
-
-				return [
-					x1, // x
-					y1, // y
-					w, // width
-					h, // height
-				] as Array<Number>;
-			}
-
-			public function getAlignedPosition(align as Alignment, width as Numeric, height as Numeric) as Array<Number> or Null {
-				// This function will calculate the position (x,y) of a given rectangle (width, height) within a circle aligned to a direction within the circle and given boundaries
-		
-				// check if the rectangle fits with boundaries, otherwise align without looking at circle shape
-				if(width > (xMax-xMin)){
-					var y = Math.round(radius - (yMin + yMax)/2 - height/2);
-					if(align == ALIGN_LEFT){
-						var x = Math.round(xMin + radius);
-						return [x, y] as Array<Number>;
-					}else if(align == ALIGN_RIGHT){
-						var x = Math.round(xMax - width + radius);
-						return [x, y] as Array<Number>;
-					}
-				}
-				if(height > (yMax-yMin)){
-					var x = Math.round((xMin + xMax)/2 + radius - width/2);
-					if(align == ALIGN_TOP){
-						var y = Math.round(radius - yMax);
-						return [x, y] as Array<Number>;
-					}else if(align == ALIGN_BOTTOM){
-						var y = Math.round(radius - (yMin + height));
-						return [x, y] as Array<Number>;
-					}
-				}
-		
-				// transpose the aligmnent direction to ALIGN_TOP
-				var ok = false;
-				var gap = null;
-				var rr = radius*radius;
-		
-				var xMin = null, xMax = null, yMax = null, size = null; // all floats
-				if(align == ALIGN_TOP){
-					xMin = self.xMin;
-					xMax = self.xMax;
-					yMax = self.yMax;
-					size = width;
-				}else if(align == ALIGN_BOTTOM){
-					xMin = -self.xMax;
-					xMax = -self.xMin;
-					yMax = -self.yMin;
-					size = width;
-				}else if(align == ALIGN_LEFT){
-					xMin = self.yMin;
-					xMax = self.yMax;
-					yMax = -self.xMin;
-					size = height;
-				}else if(align == ALIGN_RIGHT){
-					xMin = -self.yMax;
-					xMax = -self.yMin;
-					yMax = self.xMax;
-					size = height;
-				}else{
-					return null;
-				}
-		
-				// get space at max and check if the size already fits
-				// y² + x² = radius²
-				// x = ± √ (radius² - yMax²)
-				var xMinC = MyMath.max([-Math.sqrt(rr - yMax*yMax), xMin] as Array<Numeric>);
-				var xMaxC = MyMath.min([Math.sqrt(rr - yMax*yMax), xMax] as Array<Numeric>);
-				var yMaxC = yMax;
-				var space = xMaxC - xMinC;
-				gap = space - size;
-				ok = (gap >= 0);
-		
-				if(!ok){
-					// now check where in the circle the rectangle fits.
-					// check if the rectangle will hit the boundary on a side
-		
-					var size2 = size/2;
-					xMinC = null;
-					xMaxC = null;
-					if(size2 > -xMin){
-						// the rectangle will hit the circle at the right side and the boundary on the left
-						size2 = size + xMin;
-						xMinC = xMin;
-					}else if(size2 > xMax){
-						// the rectangle will hit the circle at the left side and the boundary on the right
-						size2 = size - xMax;
-						xMaxC = xMax;
-					}
-		
-					// y² + x² = radius²
-					// yMax² + size2² = radius²
-					// yMax = ± √ (radius² - size2²)
-					yMaxC = Math.sqrt(rr - size2*size2);
-					xMinC = (xMinC == null) ? -size2 : xMinC;
-					xMaxC = (xMaxC == null) ? size2 : xMaxC;
-					gap = 0;
-				}
-		
-				// transpose back to original direction
-				var x = null;
-				var y = null;
-				if(align == ALIGN_TOP){
-					x = radius + xMinC + gap/2;
-					y = radius - yMaxC;
-				}else if(align == ALIGN_BOTTOM){
-					x = radius - xMaxC + gap/2;
-					y = radius + yMaxC - height;
-				}else if(align == ALIGN_LEFT){
-					x = radius - yMaxC;
-					y = radius - xMaxC + gap/2;
-				}else if(align == ALIGN_RIGHT){
-					x = radius + yMaxC - width;
-					y = radius + xMinC + gap/2;
-				}else{
-					return null;
-				}
-				return [
-					Math.round(x).toNumber(),
-					Math.round(y).toNumber()
-				] as Array<Number>;
-			}
-		
-			private static function getLimitsForRatio_4Corners(ratio as Float, radius as Float) as { :xMax as Float, :yMax as Float	}{
+			private static function reachCircleEdge_4Points(radius as Numeric, ratio as Float) as Area{
 				// this functions returns 2 Float values: xMax, yMax which indicate the top left corner of the found rectangle with given ratio
 				//         radius   ↑      ┌─────────┐
 				//	(from center)   ·    ┌─○· · · · ·○─┐   ↑ yMax (from vertical center)
@@ -853,13 +408,31 @@ module MyModule{
 				//	yMax = √(radius² / (ratio² + 1))
 				var yMax = Math.sqrt(radius*radius / (ratio*ratio + 1));
 				var xMax = ratio * yMax;
-				return {
-					:xMax => xMax,
-					:yMax => yMax,
-				};
+
+				return Area.create(
+					-xMax,	// xMin
+					xMax,	// xMax
+					-yMax,	// yMin
+					yMax	// yMax
+				);
 			}
 
-			private static function getLimitsForRatio_2Corners(ratio as Float, offset as Float, radius as Float) as { :max as Float, :range as Float } {
+			private static function reachCircleEdge_2Points(radius as Numeric, boundaries as Area, ratio as Float, direction as Direction|Number) as Area{
+				// determine the direction
+				var offset = 0;
+				if(direction == TOP){
+					offset = boundaries.yMin;
+				}else if(direction == BOTTOM){
+					offset = -boundaries.yMax;
+				}else if(direction == LEFT){
+					offset = -boundaries.xMax;
+					ratio = 1 / ratio;
+				}else if(direction == RIGHT){
+					offset = boundaries.xMin;
+					ratio = 1 / ratio;
+				}else{
+					throw new Lang.InvalidValueException("The given quadrants do not represent a straight single direction");
+				}
 				// this functions returns 2 Float values: max and range
 				//		max: the distance from the center to the outer rectangel side
 				//		range: the distance from the center to both sides of the rectangle
@@ -899,17 +472,64 @@ module MyModule{
 		
 				var a = 1+Math.pow(ratio/2, 2);
 				var b = -ratio*ratio/2 * offset;
-				var c = Math.pow(ratio/2*offset, 2) - radius*radius;
+				var c = Math.pow(ratio/2 * offset, 2) - radius*radius;
 				var results = MyMath.getAbcFormulaResults(a, b, c);
 				var max = results[1];
 				var range = ratio * (max - offset) / 2;
-				return {
-					:max => max,
-					:range => range,
-				};
+
+
+				// Now transpose to given direction
+				if(direction == TOP){
+					return Area.create(
+						- range, 	// xMin
+						range, 		// xMax
+						offset,		// yMin
+						max		    // yMax
+					);
+				}else if(direction == BOTTOM){
+					return Area.create(
+						-range, 	// xMin
+						range, 		// xMax
+						-max,		// yMin
+						-offset		// yMax
+					);
+				}else if(direction == RIGHT){
+					return Area.create(
+						offset, 	// xMin
+						max, 		// xMax
+						-range,		// yMin
+						range		// yMax
+					);
+				}else{ //(direction == LEFT){
+					return Area.create(
+						-max, 		// xMin
+						-offset,	// xMax
+						-range,		// yMin
+						range		// yMax
+					);
+				}
 			}
 
-			private static function getLimitsForRatio_1Corner(ratio as Float, xOffset as Float, yOffset as Float, radius as Float) as { :xMax as Float, :yMax as Float }{
+			private static function reachCircleEdge_1Point(radius as Numeric, boundaries as Area, ratio as Float, quadrant as Quadrant|Number) as Area{
+				// This function calculates the xy coordinates where the circle edge in given quadrant is reached from a point within the circle and with a given ratio (slope)
+				var xOffset = 0;
+				var yOffset = 0;
+				if(quadrant == QUADRANT_TOP_RIGHT){
+					xOffset = boundaries.xMin;
+					yOffset = boundaries.yMin;
+				}else if(quadrant == QUADRANT_TOP_LEFT){
+					xOffset = -boundaries.xMax;
+					yOffset = boundaries.yMin;
+				}else if(quadrant == QUADRANT_BOTTOM_RIGHT){
+					xOffset = boundaries.xMin;
+					yOffset = -boundaries.yMax;
+				}else if(quadrant == QUADRANT_BOTTOM_LEFT){
+					xOffset = -boundaries.xMax;
+					yOffset = -boundaries.yMax;
+				}else{
+					throw new Lang.InvalidValueException(Lang.format("The qiven quadrant $1$ does not represent a single valid quadrant", [quadrant]));
+				}				
+
 				// this functions returns 2 Float values: xMax, yMax which indicate the top left corner of the found rectangle with given ratio
 				//         radius   ↑      ┌─┬───────┐
 				//	(from center)   ·    ┌─┘ •· · · ·○─┐   ↑ yMax (from vertical center)
@@ -949,12 +569,77 @@ module MyModule{
 				var h = w / ratio;
 				var yMax = yOffset + h;
 				var xMax = xOffset + w;
-				return {
-					:xMax => xMax,
-					:yMax => yMax,
-				};
+
+				// Now transpose back to original quadrant
+				if(quadrant == QUADRANT_TOP_RIGHT){
+					return Area.create(
+						xOffset,	// xMin
+						xMax,		// xMax
+						yOffset,	// yMin
+						yMax		// yMax
+					);
+				}else if(quadrant == QUADRANT_TOP_LEFT){
+					return Area.create(
+						-xMax,		// xMin
+						-xOffset,	// xMax
+						yOffset,	// yMin
+						yMax		// yMax
+					);
+				}else if(quadrant == QUADRANT_BOTTOM_RIGHT){
+					return Area.create(
+						xOffset,	// xMin
+						xMax,		// xMax
+						-yMax,	    // yMin
+						-yOffset	// yMax
+					);
+				}else{ // if(quadrants == QUADRANT_BOTTOM_LEFT){
+					return Area.create(
+						-xMax,		// xMin
+						-xOffset,	// xMax
+						-yMax,	    // yMin
+						-yOffset	// yMax
+					);
+				}
+			}
+
+			private static function shrinkAndResize(area as Area, radius as Numeric, boundaries as Area, quadrants as Quadrant|Number) as Void{
+				// first shrink and then determine the resize direction(s)
+				var directions = 0;
+				if(area.xMin < boundaries.xMin){
+					area.xMin = boundaries.xMin;
+					directions |= TOP|BOTTOM;
+				}
+				if(area.xMax > boundaries.xMax){
+					area.xMax = boundaries.xMax;
+					directions |= TOP|BOTTOM;
+				}
+				if(area.yMax > boundaries.yMax){
+					area.yMax = boundaries.yMax;
+					directions |= LEFT|RIGHT;
+				}
+				if(area.yMin < boundaries.yMin){
+					area.yMin = boundaries.yMin;
+					directions |= LEFT|RIGHT;
+				}
+
+				// check which resizing direction is required
+				var include_directions = 0;
+				if(quadrants & (QUADRANT_TOP_LEFT|QUADRANT_TOP_RIGHT) > 0){ include_directions |= TOP; }
+				if(quadrants & (QUADRANT_TOP_RIGHT|QUADRANT_BOTTOM_RIGHT) > 0){ include_directions |= RIGHT; }
+				if(quadrants & (QUADRANT_BOTTOM_LEFT|QUADRANT_BOTTOM_RIGHT) > 0){ include_directions |= BOTTOM; }
+				if(quadrants & (QUADRANT_TOP_LEFT|QUADRANT_BOTTOM_LEFT) > 0){ include_directions |= LEFT; }
+				directions &= include_directions;
+
+				// Do the resizing till the circle edge
+				var r2 = radius * radius;
+				var x = MyMath.max([-boundaries.xMin, boundaries.xMax] as Array<Numeric>);
+				var y = MyMath.max([-boundaries.yMin, boundaries.yMax] as Array<Numeric>);
+
+				if(directions & TOP > 0){ area.yMax = Math.sqrt(r2 - x*x); }
+				if(directions & LEFT > 0){ area.xMin = -Math.sqrt(r2 - y*y); }
+				if(directions & BOTTOM > 0){ area.yMin = -Math.sqrt(r2 - x*x); }
+				if(directions & RIGHT > 0){ area.xMax = Math.sqrt(r2 - y*y); }
 			}
 		}
-*/
 	}
 }
