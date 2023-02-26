@@ -18,10 +18,10 @@ module MyModule{
 		}
 
 		enum Direction {
-			LEFT = 1,
-			RIGHT = 2,
-			TOP = 4,
-			BOTTOM = 8,
+			TOP = 1,
+			LEFT = 2,
+			BOTTOM = 4,
+			RIGHT = 8,
 		}
 
 		enum Quadrant {
@@ -32,129 +32,84 @@ module MyModule{
 			QUADRANTS_ALL = 15
 		}
 
-		class Area{
-			// The area uses x and y with 4 quadrant orientation
-			// xyCenter = (0,0)
-			// xyTopLeft = (screenHeight/2, -screenWidth/2)
-			// xyBottomRight = (-screenHeight/2, screenWidth/2)
-			var xOffset as Number;
-			var yOffset as Number;
-			var xMin as Numeric;
-			var xMax as Numeric;
-			var yMin as Numeric;
-			var yMax as Numeric;
+		typedef Area as interface{
+			var locX as Numeric;
+			var locY as Numeric;
+			var width as Numeric;
+			var height as Numeric;
+		};
+
+		class MyArea{
+			var locX as Numeric;
+			var locY as Numeric;
+			var width as Numeric;
+			var height as Numeric;
 
 			function initialize(locX as Numeric, locY as Numeric, width as Numeric, height as Numeric) {
-				// Transposes screen orientation to 4 quadrant orientation
-				// 	screen: xy(0,0) => topleft
-				//	4 quadrant: xy(0,0) => center
-				var deviceSettings = System.getDeviceSettings();
-				xOffset = deviceSettings.screenWidth / 2;
-				yOffset = deviceSettings.screenHeight / 2;
-
-				xMin = locX - xOffset;
-				xMax = (locX + width) - xOffset;
-				yMax = yOffset - locY;
-				yMin = yOffset - (locY + height);
-			}
-			static function create(xMin as Numeric, xMax as Numeric, yMin as Numeric, yMax as Numeric) as Area{
-				// creates an area based upon the coordinate system with the center of the circle as point (0,0)
-				var area = new Area(0,0,0,0);
-				area.xMin = xMin;
-				area.yMin = yMin;
-				area.xMax = xMax;
-				area.yMax = yMax;
-				return area;
-			}
-
-			function clone() as Area{ return Area.create(xMin, xMax, yMin, yMax); }
-			function locX() as Numeric{ return xMin + xOffset; }
-			function locY() as Numeric { return yOffset - yMax; }
-			function width() as Numeric{ return xMax - xMin; }
-			function height() as Numeric{ return yMax - yMin; }
-			function roundToInt() as Void{
-				// round down all coordinates to integers
-				xMin = Math.ceil(xMin).toNumber();
-				xMax = Math.floor(xMax).toNumber();
-				yMin = Math.ceil(yMin).toNumber();
-				yMax = Math.floor(yMax).toNumber();
-			}
-
-			function rotateToNextQuadrant() as Void{
-				var xMin = self.xMin;
-				self.xMin = -yMax;
-				self.yMax = xMax;
-				self.xMax = -yMin;
-				self.yMin = xMin;
-			}
-			function rotateToPreviousQuadrant() as Void{
-				var xMin = self.xMin;
-				self.xMin = yMin;
-				self.yMin = -xMax;
-				self.xMax = yMax;
-				self.yMax = -xMin;
-			}
-			function flipHorizontal() as Void{
-				var xMin = self.xMin;
-				self.xMin = -xMax;
-				self.xMax = -xMin;
-			}
-			function flipVertical() as Void{
-				var yMin = self.yMin;
-				self.yMin = -yMax;
-				self.yMax = -yMin;
-			}
-			function toString() as String{
-				return Lang.format("(x, y) = ($1$, $2$), (width, height) = ($3$, $4$)", [locX(), locY(), width(), height()]);
-				// return Lang.format("xyMin = ($1$, $2$), xyMax = ($3$, $4$)", [xMin, yMin, xMax, yMax]);
+				self.locX = locX;
+				self.locY = locY;
+				self.width = width;
+				self.height = height;
 			}
 		}
 
 		class LayoutHelper{
 			// Simple helper not taking account of round edges
-
-			function getAreaWithRatio(boundaries as Area, ratio as Float) as Area|Null{
+			function fitAreaWithRatio(area as Area, boundaries as Area, ratio as Float) as Void{
 				// returnes an area with given ratio (=width/height) within given boundaries
-				var w = boundaries.width();
-				var h = boundaries.height();
+				var w = boundaries.width;
+				var h = boundaries.height;
 				var r = w/h;
 
 				if(r > ratio){
 					// shrink width
 					var width = h * ratio;
 					var dx = 0.5f * (w - width);
-					return Area.create(boundaries.xMin + dx, boundaries.xMax - dx, boundaries.yMin, boundaries.yMax);
+					area.locX = boundaries.locX + dx;
+					area.locY = boundaries.locY;
+					area.width = boundaries.width - dx;
+					area.height = boundaries.height;
 				}else if(r < ratio){
 					// shrink height
 					var height = w / ratio;
 					var dy = 0.5f * (h - height);
-					return Area.create(boundaries.xMin, boundaries.xMax, boundaries.yMin + dy, boundaries.yMax - dy);
+					area.locX = boundaries.locX;
+					area.locY = boundaries.locY + dy;
+					area.width = boundaries.width;
+					area.height = boundaries.height - dy;
 				}else{
 					// already has requested ratio
-					return boundaries.clone();
+					copyArea(boundaries, area);
 				}
 			}
 
-			function setAreaAligned(boundaries as Area, area as Area, alignment as Direction|Number) as Void{
+			function setAreaAligned(area as Area, boundaries as Area, alignment as Direction|Number) as Void{
 				var left = (alignment & LEFT) > 0;
 				var right = (alignment & RIGHT) > 0;
 				var top = (alignment & TOP) > 0;
 				var bottom = (alignment & BOTTOM) > 0;
 
 				// horizontal alignment
-				var dx = (left && !right) ? area.xMin - boundaries.xMin // align left
-					: (right && !left) ? boundaries.xMax - area.xMax  // align right
-					: ((boundaries.xMin + boundaries.xMax) - (area.xMin + area.xMax))/2; // align centered
+				var dx = (left && !right)
+					? area.locX - boundaries.locX // align left
+					: (right && !left)
+						? (boundaries.locX + boundaries.width) - (area.locX + area.width)  // align right
+						: ((boundaries.locX + boundaries.width) - (area.locX + area.width))/2; // align centered
 
 				// vertical alignment
-				var dy = (top && !bottom) ? boundaries.yMax - area.yMax	// align top
-					: (bottom && !top) ? boundaries.yMin - area.yMin	// align bottom
-					: ((boundaries.yMin + boundaries.yMax) - (area.yMin + area.yMax))/2; // align middle
+				var dy = (top && !bottom) ? boundaries.locY - area.locY	// align top
+					: (bottom && !top) ? (boundaries.locY + boundaries.height) - (area.locY + area.height)	// align bottom
+					: ((boundaries.locY + boundaries.height) - (area.locY + area.height))/2; // align middle
 
-				area.xMin += dx;
-				area.xMax += dx;
-				area.yMin += dy;
-				area.yMax += dy;
+				area.locX += dx;
+				area.locY += dy;
+			}
+
+			function copyArea(source as Area, destination as Area) as Void{
+				destination.locX = source.locX;
+				destination.locY = source.locY;
+				destination.width = source.width;
+				destination.height = source.height;
 			}		
 		}
 
@@ -166,16 +121,15 @@ module MyModule{
 				LayoutHelper.initialize();
 			}
 
-			function setAreaAligned(boundaries as Area, area as Area, alignment as Direction|Number) as Void{
-				LayoutHelper.setAreaAligned(boundaries, area, alignment);
+			function setAreaAligned(area as Area, boundaries as Area, alignment as Direction|Number) as Void{
+				throw new MyException("not yet implemented");
 			}
 
-			function getAreaWithRatio(boundaries as Area, ratio as Float) as Area|Null {
-				var xMin = boundaries.xMin;
-				var xMax = boundaries.xMax;
-				var yMin = boundaries.yMin;
-				var yMax = boundaries.yMax;
-				var area = null;
+			function fitAreaWithRatio(area as Area, boundaries as Area, ratio as Float) as Void {
+				var xMin = xMin(boundaries);
+				var xMax = xMax(boundaries);
+				var yMin = yMin(boundaries);
+				var yMax = yMax(boundaries);
 
 				// check if which quadrants the boundaries are outside the circle
 				//                          ┌─────────┐
@@ -214,24 +168,23 @@ module MyModule{
 					quadrants |= QUADRANT_BOTTOM_RIGHT;
 				}
 
-				// No quadrants reached -> return the full area
+				// No quadrants reached -> return the full boundaries area
 				if(quadrants == 0){
-					area = boundaries.clone();
-					area.roundToInt();
-					return area;
+					copyArea(boundaries, area);
+					return;
 				}
 
 				// check if the circle edge can be reached with all 4 corners
 				if(quadrants == (QUADRANT_TOP_RIGHT|QUADRANT_TOP_LEFT|QUADRANT_BOTTOM_LEFT|QUADRANT_BOTTOM_RIGHT)){
-					area = reachCircleEdge_4Points(radius, ratio);
+					reachCircleEdge_4Points(area, ratio);
 
 					// check boundaries
-					var exceeded_quadrants = checkBoundaries(boundaries, area);
+					var exceeded_quadrants = checkBoundaries(area, boundaries);
 					if(exceeded_quadrants != 0){
 						//quadrants &= ~exceeded_quadrants;
 					}else{
-						area.roundToInt();
-						return area;
+						roundArea(area);
+						return;
 					}
 				}
 
@@ -261,14 +214,14 @@ module MyModule{
 
 					// Choose direction from opposite directions
 					if(directions & (LEFT|RIGHT) == (LEFT|RIGHT)){
-						if(boundaries.xMin + boundaries.xMax > 0){
+						if(xMin + xMax > 0){
 							directions &= ~LEFT;
 						}else{
 							directions &= ~RIGHT;
 						}
 					}
 					if(directions & (TOP|BOTTOM) == (TOP|BOTTOM)){
-						if(boundaries.yMin + boundaries.yMax > 0){
+						if(yMin + yMax > 0){
 							directions &= ~BOTTOM;
 						}else{
 							directions &= ~TOP;
@@ -278,15 +231,15 @@ module MyModule{
 					var directionsArray = MyMath.getBitValues(directions);
 					for(var i=0; i<directionsArray.size(); i++){
 						var direction = directionsArray[i] as Direction;
-						area = reachCircleEdge_2Points(radius, boundaries, ratio, direction);
+						reachCircleEdge_2Points(area, boundaries, ratio, direction);
 
 						// check boundaries
-						var exceeded_quadrants = checkBoundaries(boundaries, area);
+						var exceeded_quadrants = checkBoundaries(area, boundaries);
 						if(exceeded_quadrants > 0){
 							// quadrants &= ~exceeded_quadrants;
 						}else{
-							area.roundToInt();
-							return area;
+							roundArea(area);
+							return;
 						}
 					}
 				}
@@ -302,14 +255,14 @@ module MyModule{
 						var removed_quadrants = 0;
 						if(quadrants & QUADRANT_TOP_RIGHT > 0){
 							if(quadrants & QUADRANT_TOP_LEFT > 0){
-								if(boundaries.xMin+boundaries.xMax > 0){
+								if(xMin + xMax > 0){
 									removed_quadrants |= QUADRANT_TOP_LEFT;
 								}else{
 									removed_quadrants |= QUADRANT_TOP_RIGHT;
 								}
 							}
 							if(quadrants & QUADRANT_BOTTOM_RIGHT > 0){
-								if(boundaries.yMin+boundaries.yMax > 0){
+								if(yMin + yMax > 0){
 									removed_quadrants |= QUADRANT_BOTTOM_RIGHT;
 								}else{
 									removed_quadrants |= QUADRANT_TOP_RIGHT;
@@ -318,14 +271,14 @@ module MyModule{
 						}
 						if(quadrants & QUADRANT_BOTTOM_LEFT > 0){
 							if(quadrants & QUADRANT_BOTTOM_RIGHT > 0){
-								if(boundaries.xMin+boundaries.xMax > 0){
+								if(xMin + xMax > 0){
 									removed_quadrants |= QUADRANT_BOTTOM_LEFT;
 								}else{
 									removed_quadrants |= QUADRANT_BOTTOM_RIGHT;
 								}
 							}
 							if(quadrants & QUADRANT_TOP_LEFT > 0){
-								if(boundaries.yMin+boundaries.yMax > 0){
+								if(yMin + yMax > 0){
 									removed_quadrants |= QUADRANT_BOTTOM_LEFT;
 								}else{
 									removed_quadrants |= QUADRANT_TOP_LEFT;
@@ -334,52 +287,60 @@ module MyModule{
 						}
 						quadrant &= ~removed_quadrants;
 					}
-					area = reachCircleEdge_1Point(radius, boundaries, ratio, quadrant);
+					reachCircleEdge_1Point(area, boundaries, ratio, quadrant);
 
 					// check boundaries
-					var exceeded_quadrants = checkBoundaries(boundaries, area);
+					var exceeded_quadrants = checkBoundaries(area, boundaries);
 					if(exceeded_quadrants == 0){
-						area.roundToInt();
-						return area;
+						roundArea(area);
+						return;
 					}
 				}
 
 				if(quadrants > 0){
 					// shrink to fit within boundaries (ratio only to determine shrink and grow direction)
 					if(area != null){
-						shrinkAndResize(area, radius, boundaries, quadrants);
-						area.roundToInt();
-						return area;
+						shrinkAndResize(area, boundaries, quadrants);
+						roundArea(area);
+						return;
 					}
 				}
-
-				// No restrictions for the edge found
-				return LayoutHelper.getAreaWithRatio(boundaries, ratio);
 			}
 
-			private function checkBoundaries(boundaries as Area, area as Area) as Quadrant|Number{
+			private function checkBoundaries(area as Area, boundaries as Area) as Quadrant|Number{
 				// this number results with the quadrants in which the limits are exceeded
 				var quadrants_exceeded = 0;
-				if(area.xMin < boundaries.xMin){
-					if(area.yMax > 0) { quadrants_exceeded |= QUADRANT_TOP_LEFT; }
-					if(area.yMin < 0) { quadrants_exceeded |= QUADRANT_BOTTOM_LEFT; }
+
+				var xMin = Math.ceil(xMin(boundaries)).toNumber();
+				var xMax = Math.floor(xMax(boundaries)).toNumber();
+				var yMin = Math.ceil(yMin(boundaries)).toNumber();
+				var yMax = Math.floor(yMax(boundaries)).toNumber();
+
+				var xMin_ = Math.ceil(xMin(area)).toNumber();
+				var xMax_ = Math.floor(xMax(area)).toNumber();
+				var yMin_ = Math.ceil(yMin(area)).toNumber();
+				var yMax_ = Math.floor(yMax(area)).toNumber();
+
+				if(xMin_ < xMin){
+					if(yMax_ > 0) { quadrants_exceeded |= QUADRANT_TOP_LEFT; }
+					if(yMin_ < 0) { quadrants_exceeded |= QUADRANT_BOTTOM_LEFT; }
 				}
-				if(area.xMax > boundaries.xMax){
-					if(area.yMax > 0) { quadrants_exceeded |= QUADRANT_TOP_RIGHT; }
-					if(area.yMin < 0) { quadrants_exceeded |= QUADRANT_BOTTOM_RIGHT; }
+				if(xMax_ > xMax){
+					if(yMax_ > 0) { quadrants_exceeded |= QUADRANT_TOP_RIGHT; }
+					if(yMin_ < 0) { quadrants_exceeded |= QUADRANT_BOTTOM_RIGHT; }
 				}
-				if(area.yMax > boundaries.yMax){
-					if(area.xMax > 0) { quadrants_exceeded |= QUADRANT_TOP_RIGHT; }
-					if(area.xMin < 0) { quadrants_exceeded |= QUADRANT_TOP_LEFT; }
+				if(yMax_ > yMax){
+					if(xMax_ > 0) { quadrants_exceeded |= QUADRANT_TOP_RIGHT; }
+					if(xMin_ < 0) { quadrants_exceeded |= QUADRANT_TOP_LEFT; }
 				}
-				if(area.yMin < boundaries.yMin){
-					if(area.xMax > 0) { quadrants_exceeded |= QUADRANT_BOTTOM_RIGHT; }
-					if(area.xMin < 0) { quadrants_exceeded |= QUADRANT_BOTTOM_LEFT; }
+				if(yMin_ < yMin){
+					if(xMax_ > 0) { quadrants_exceeded |= QUADRANT_BOTTOM_RIGHT; }
+					if(xMin_ < 0) { quadrants_exceeded |= QUADRANT_BOTTOM_LEFT; }
 				}
 				return quadrants_exceeded;
 			}
 
-			private static function reachCircleEdge_4Points(radius as Numeric, ratio as Float) as Area{
+			private function reachCircleEdge_4Points(area as Area, ratio as Float) as Void{
 				// this functions returns 2 Float values: xMax, yMax which indicate the top left corner of the found rectangle with given ratio
 				//         radius   ↑      ┌─────────┐
 				//	(from center)   ·    ┌─○· · · · ·○─┐   ↑ yMax (from vertical center)
@@ -409,26 +370,29 @@ module MyModule{
 				var yMax = Math.sqrt(radius*radius / (ratio*ratio + 1));
 				var xMax = ratio * yMax;
 
-				return Area.create(
-					-xMax,	// xMin
-					xMax,	// xMax
-					-yMax,	// yMin
-					yMax	// yMax
-				);
+				setXmin(area, -xMax);
+				setXmax(area, xMax);
+				setYmin(area, -yMax);
+				setYmax(area, yMax);
 			}
 
-			private static function reachCircleEdge_2Points(radius as Numeric, boundaries as Area, ratio as Float, direction as Direction|Number) as Area{
+			private function reachCircleEdge_2Points(area as Area, boundaries as Area, ratio as Float, direction as Direction|Number) as Void{
 				// determine the direction
 				var offset = 0;
+				var xMin = xMin(boundaries);
+				var xMax = xMax(boundaries);
+				var yMin = yMin(boundaries);
+				var yMax = yMax(boundaries);
+
 				if(direction == TOP){
-					offset = boundaries.yMin;
+					offset = yMin;
 				}else if(direction == BOTTOM){
-					offset = -boundaries.yMax;
+					offset = -yMax;
 				}else if(direction == LEFT){
-					offset = -boundaries.xMax;
+					offset = -xMax;
 					ratio = 1 / ratio;
 				}else if(direction == RIGHT){
-					offset = boundaries.xMin;
+					offset = xMin;
 					ratio = 1 / ratio;
 				}else{
 					throw new Lang.InvalidValueException("The given quadrants do not represent a straight single direction");
@@ -480,52 +444,46 @@ module MyModule{
 
 				// Now transpose to given direction
 				if(direction == TOP){
-					return Area.create(
-						- range, 	// xMin
-						range, 		// xMax
-						offset,		// yMin
-						max		    // yMax
-					);
+
+					setXmin(area, -range);
+					setXmax(area, range);
+					setYmin(area, offset);
+					setYmax(area, max);
 				}else if(direction == BOTTOM){
-					return Area.create(
-						-range, 	// xMin
-						range, 		// xMax
-						-max,		// yMin
-						-offset		// yMax
-					);
+					setXmin(area, -range);
+					setXmax(area, range);
+					setYmin(area, -max);
+					setYmax(area, -offset);
 				}else if(direction == RIGHT){
-					return Area.create(
-						offset, 	// xMin
-						max, 		// xMax
-						-range,		// yMin
-						range		// yMax
-					);
-				}else{ //(direction == LEFT){
-					return Area.create(
-						-max, 		// xMin
-						-offset,	// xMax
-						-range,		// yMin
-						range		// yMax
-					);
+					setXmin(area, offset);
+					setXmax(area, max);
+					setYmin(area, -range);
+					setYmax(area, range);
+				}else if(direction == LEFT){
+					setXmin(area, -max);
+					setXmax(area, -offset);
+					setYmin(area, -range);
+					setYmax(area, range);
 				}
 			}
 
-			private static function reachCircleEdge_1Point(radius as Numeric, boundaries as Area, ratio as Float, quadrant as Quadrant|Number) as Area{
+			private function reachCircleEdge_1Point(area as Area, boundaries as Area, ratio as Float, quadrant as Quadrant|Number) as Void{
 				// This function calculates the xy coordinates where the circle edge in given quadrant is reached from a point within the circle and with a given ratio (slope)
 				var xOffset = 0;
 				var yOffset = 0;
+
 				if(quadrant == QUADRANT_TOP_RIGHT){
-					xOffset = boundaries.xMin;
-					yOffset = boundaries.yMin;
+					xOffset = xMin(boundaries);
+					yOffset = yMin(boundaries);
 				}else if(quadrant == QUADRANT_TOP_LEFT){
-					xOffset = -boundaries.xMax;
-					yOffset = boundaries.yMin;
+					xOffset = -xMax(boundaries);
+					yOffset = yMin(boundaries);
 				}else if(quadrant == QUADRANT_BOTTOM_RIGHT){
-					xOffset = boundaries.xMin;
-					yOffset = -boundaries.yMax;
+					xOffset = xMin(boundaries);
+					yOffset = -yMax(boundaries);
 				}else if(quadrant == QUADRANT_BOTTOM_LEFT){
-					xOffset = -boundaries.xMax;
-					yOffset = -boundaries.yMax;
+					xOffset = -xMax(boundaries);
+					yOffset = -yMax(boundaries);
 				}else{
 					throw new Lang.InvalidValueException(Lang.format("The qiven quadrant $1$ does not represent a single valid quadrant", [quadrant]));
 				}				
@@ -572,53 +530,50 @@ module MyModule{
 
 				// Now transpose back to original quadrant
 				if(quadrant == QUADRANT_TOP_RIGHT){
-					return Area.create(
-						xOffset,	// xMin
-						xMax,		// xMax
-						yOffset,	// yMin
-						yMax		// yMax
-					);
+					setXmin(area, xOffset);
+					setXmax(area, xMax);
+					setYmin(area, yOffset);
+					setYmax(area, yMax);
 				}else if(quadrant == QUADRANT_TOP_LEFT){
-					return Area.create(
-						-xMax,		// xMin
-						-xOffset,	// xMax
-						yOffset,	// yMin
-						yMax		// yMax
-					);
+					setXmin(area, -xMax);
+					setXmax(area, -xOffset);
+					setYmin(area, yOffset);
+					setYmax(area, yMax);
 				}else if(quadrant == QUADRANT_BOTTOM_RIGHT){
-					return Area.create(
-						xOffset,	// xMin
-						xMax,		// xMax
-						-yMax,	    // yMin
-						-yOffset	// yMax
-					);
-				}else{ // if(quadrants == QUADRANT_BOTTOM_LEFT){
-					return Area.create(
-						-xMax,		// xMin
-						-xOffset,	// xMax
-						-yMax,	    // yMin
-						-yOffset	// yMax
-					);
+					setXmin(area, xOffset);
+					setXmax(area, xMax);
+					setYmin(area, -yMax);
+					setYmax(area, -yOffset);
+				}else if(quadrant == QUADRANT_BOTTOM_LEFT){
+					setXmin(area, -xMax);
+					setXmax(area, -xOffset);
+					setYmin(area, -yMax);
+					setYmax(area, -yOffset);
 				}
 			}
 
-			private static function shrinkAndResize(area as Area, radius as Numeric, boundaries as Area, quadrants as Quadrant|Number) as Void{
+			private function shrinkAndResize(area as Area, boundaries as Area, quadrants as Quadrant|Number) as Void{
+				var xMin = xMin(boundaries);
+				var xMax = xMax(boundaries);
+				var yMin = yMin(boundaries);
+				var yMax = yMax(boundaries);
+
 				// first shrink and then determine the resize direction(s)
 				var directions = 0;
-				if(area.xMin < boundaries.xMin){
-					area.xMin = boundaries.xMin;
+				if(xMin(area) < xMin){
+					setXmin(area, xMin);
 					directions |= TOP|BOTTOM;
 				}
-				if(area.xMax > boundaries.xMax){
-					area.xMax = boundaries.xMax;
+				if(xMax(area) > xMax){
+					setXmax(area, xMax);
 					directions |= TOP|BOTTOM;
 				}
-				if(area.yMax > boundaries.yMax){
-					area.yMax = boundaries.yMax;
+				if(yMax(area) > yMax){
+					setYmax(area, yMax);
 					directions |= LEFT|RIGHT;
 				}
-				if(area.yMin < boundaries.yMin){
-					area.yMin = boundaries.yMin;
+				if(yMin(area) < yMin){
+					setYmin(area, yMin);
 					directions |= LEFT|RIGHT;
 				}
 
@@ -632,13 +587,62 @@ module MyModule{
 
 				// Do the resizing till the circle edge
 				var r2 = radius * radius;
-				var x = MyMath.max([-boundaries.xMin, boundaries.xMax] as Array<Numeric>);
-				var y = MyMath.max([-boundaries.yMin, boundaries.yMax] as Array<Numeric>);
+				var x = MyMath.max([-xMin, xMax] as Array<Numeric>);
+				var y = MyMath.max([-yMin, yMax] as Array<Numeric>);
 
-				if(directions & TOP > 0){ area.yMax = Math.sqrt(r2 - x*x); }
-				if(directions & LEFT > 0){ area.xMin = -Math.sqrt(r2 - y*y); }
-				if(directions & BOTTOM > 0){ area.yMin = -Math.sqrt(r2 - x*x); }
-				if(directions & RIGHT > 0){ area.xMax = Math.sqrt(r2 - y*y); }
+				if(directions & TOP > 0){ setYmax(area, Math.sqrt(r2 - x*x)); }
+				if(directions & LEFT > 0){ setXmin(area, -Math.sqrt(r2 - y*y)); }
+				if(directions & BOTTOM > 0){ setYmin(area, -Math.sqrt(r2 - x*x)); }
+				if(directions & RIGHT > 0){ setXmax(area, Math.sqrt(r2 - y*y)); }
+			}
+
+			// helper functions:
+			// converts drawable locX, locY:
+			//
+			//   0 →
+			// 0 ┌────────
+			// ↓ │
+			//   │
+			//   │
+			//
+			// to: (based upon circle center):
+			//  ↑     │
+			//  0 ────┼────
+			//        │
+			//        0 →
+						
+			function xMin(area as Area) as Numeric{ return area.locX - radius; }
+			function xMax(area as Area) as Numeric{ return area.locX + area.width - radius; }
+			function yMin(area as Area) as Numeric{ return radius - (area.locY + area.height); }
+			function yMax(area as Area) as Numeric{ return radius - area.locY; }
+
+			private function setXmin(area as Area, xMin as Numeric) as Void{
+				var dx = xMin - xMin(area);
+				area.locX += dx;
+				area.width -= dx;
+			}
+			private function setXmax(area as Area, xMax as Numeric) as Void{
+				var dx = xMax - xMax(area);
+				area.width += dx;
+			}
+			private function setYmin(area as Area, yMin as Numeric) as Void{
+				var dy = yMin - yMin(area);
+				area.height -= dy;
+			}
+			private function setYmax(area as Area, yMax as Numeric) as Void{
+				var dy = yMax - yMax(area);
+				area.locY -= dy;
+				area.height += dy;
+			}
+			function roundArea(area as Area) as Void{
+				var xMin = Math.round(xMin(area)).toNumber();
+				var xMax = Math.round(xMax(area)).toNumber();
+				var yMin = Math.round(yMin(area)).toNumber();
+				var yMax = Math.round(yMax(area)).toNumber();
+				area.locX = xMin + radius;
+				area.width = xMax - xMin;
+				area.locY = radius - yMax;
+				area.height = yMax - yMin;
 			}
 		}
 	}
