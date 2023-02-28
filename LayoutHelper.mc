@@ -94,12 +94,12 @@ module MyModule{
 					? area.locX - boundaries.locX // align left
 					: (right && !left)
 						? (boundaries.locX + boundaries.width) - (area.locX + area.width)  // align right
-						: ((boundaries.locX + boundaries.width) - (area.locX + area.width))/2; // align centered
+						: 0.5f * ((boundaries.locX + boundaries.width) - (area.locX + area.width)); // align centered
 
 				// vertical alignment
 				var dy = (top && !bottom) ? boundaries.locY - area.locY	// align top
 					: (bottom && !top) ? (boundaries.locY + boundaries.height) - (area.locY + area.height)	// align bottom
-					: ((boundaries.locY + boundaries.height) - (area.locY + area.height))/2; // align middle
+					: 0.5f * ((boundaries.locY + boundaries.height) - (area.locY + area.height)); // align middle
 
 				area.locX += dx;
 				area.locY += dy;
@@ -122,7 +122,199 @@ module MyModule{
 			}
 
 			function setAreaAligned(area as Area, boundaries as Area, alignment as Direction|Number) as Void{
-				throw new MyException("not yet implemented");
+				if(boundaries.width > area.width && boundaries.height > area.height){
+					// common values
+					var r2 = radius*radius;
+					var xMin=0; var xMax=0; var yMin=0; var yMax=0; var xMin_=0; var xMax_=0; var yMin_=0; var yMax_=0;
+
+					// calculate the following 2 variables to move the object
+					var dx = 0;
+					var dy = 0;
+
+					// remove opposite alignment values
+					if(alignment & (TOP|BOTTOM) == (TOP|BOTTOM)){
+						alignment &= ~(TOP|BOTTOM);
+					}
+					if(alignment & (LEFT|RIGHT) == (LEFT|RIGHT)){
+						alignment &= ~(LEFT|RIGHT);
+					}
+
+					// straight alignment
+					var alignType = MyMath.countBitsHigh(alignment as Number); // 0 => no direction (all centered), 1 => straight, 2 => diagonal
+					if(alignType == 0){
+						// No direction: CENTERED
+						throw new Tools.MyException("Not yet supported");
+					}else if(alignType == 1){
+						// straight: LEFT or RIGHT or TOP or BOTTOM
+						var diameter = 2 * radius;
+						// Transpose all align direction to TOP using xMin, xMax, yMin, yMax as variables (with 0,0 as circle center)
+						if(alignment == TOP){
+							// no transpose required
+							xMin = xMin(boundaries);
+							xMax = xMax(boundaries);
+							yMin = yMin(boundaries);
+							yMax = yMax(boundaries);
+							xMin_ = xMin(area);
+							xMax_ = xMax(area);
+							yMin_ = yMin(area);
+							yMax_ = yMax(area);
+						}else if(alignment == RIGHT){
+							// rotate 90 degrees counter clockwise
+							xMin = -yMax(boundaries);
+							xMax = -yMin(boundaries);
+							yMin =  xMin(boundaries);
+							yMax =  xMax(boundaries);
+							xMin_ = -yMax(area);
+							xMax_ = -yMin(area);
+							yMin_ =  xMin(area);
+							yMax_ =  xMax(area);
+						}else if(alignment == BOTTOM){
+							// rotate 180 degrees
+							xMin = -xMax(boundaries);
+							xMax = -xMin(boundaries);
+							yMin = -yMax(boundaries);
+							yMax = -yMin(boundaries);
+							xMin_ = -xMax(area);
+							xMax_ = -xMin(area);
+							yMin_ = -yMax(area);
+							yMax_ = -yMin(area);
+						}else if(alignment == LEFT){
+							// rotate 90 degrees clockwise
+							xMin =  yMin(boundaries);
+							xMax =  yMax(boundaries);
+							yMin = -xMax(boundaries);
+							yMax = -xMin(boundaries);
+							xMin_ =  yMin(area);
+							xMax_ =  yMax(area);
+							yMin_ = -xMax(area);
+							yMax_ = -xMin(area);
+						}
+
+						// Do the TOP aligment
+						// check space on top boundary within the circle
+						//   y² + x² = radius²
+						//   x = ±√(radius² - y²)
+						//   xMax = +√(radius² - yMax²), xMin = -√(radius² - yMax²) 
+						var xCircle = Math.sqrt(r2 - yMax*yMax);
+						var xMaxCalc = (xCircle < xMax) ? xCircle : xMax;
+						var xMinCalc = (-xCircle > xMin) ? -xCircle : xMin;
+
+						// check if the object fits against the top boundary
+						var width_ = xMax_ - xMin_;
+						var height_ = yMax_ - yMin_;
+						if((xMaxCalc - xMinCalc) >= width_){
+							dx = ((xMinCalc + xMaxCalc) - (xMin_ + xMax_)) / 2;
+							dy = yMax - yMax_;
+						}else{
+							// move away from the border until the object fits
+							// needs space on circle both left and right or only left or right
+							var needsRight = false;
+							var needsLeft = false;
+							if(xMin > -width_/2){
+								needsRight = true;
+							}else if(xMax < width_/2){
+								needsLeft = true;
+							}else{
+								needsLeft = true;
+								needsRight = true;
+							}
+							var xNeeded = (needsLeft && needsRight) // x needed for each circle side
+								? 0.5f * width_
+								: needsLeft
+									? width_ - xMax
+									: width_ + xMin;
+							// y² + x² = radius²
+							// y = ±√(radius² - x²)
+							var yMaxCalc = Math.sqrt(r2 - xNeeded*xNeeded);
+							xMinCalc = (xMin > -xNeeded) ? xMin : -xNeeded;
+							dx = xMinCalc - xMin_;
+							dy = yMaxCalc - yMax_;
+						}
+
+						// move the object in the transposed direction
+						xMin_ += dx;
+						xMax_ += dx;
+						yMin_ += dy;
+						yMax_ += dy;
+						dy *= -1;
+
+						if(alignment == TOP){
+							area.locY += dy;
+							area.locX += dx;
+						}else if(alignment == RIGHT){
+							// rotate 90 degrees clockwise
+							area.locX += -dy;
+							area.locY += dx;
+						}else if(alignment == BOTTOM){
+							// rotate 180 degrees
+							area.locX += -dx;
+							area.locY += -dy;
+						}else if(alignment == LEFT){
+							// rotate 90 degrees counter clockwise
+							area.locX += dy;
+							area.locY += -dx;
+						}
+					}else if(alignType == 2){
+						// diagonal: TOP-LEFT or TOP-RIGHT or BOTTOM-LEFT or BOTTOM-RIGHT
+						// Transpose all align direction to TOP|RIGHT using xMin, xMax, yMin, yMax as variables (with 0,0 as circle center)
+						if(alignment == TOP|RIGHT){
+							// no rotation required
+							xMin = xMin(boundaries);
+							xMax = xMax(boundaries);
+							yMin = yMin(boundaries);
+							yMax = yMax(boundaries);
+							xMin_ = xMin(area);
+							xMax_ = xMax(area);
+							yMin_ = yMin(area);
+							yMax_ = yMax(area);
+						}else if(alignment == TOP|LEFT){
+							// flip horizontal
+							xMin = -xMax(boundaries);
+							xMax = -xMin(boundaries);
+							yMin = yMin(boundaries);
+							yMax = yMax(boundaries);
+							xMin_ = -xMax(area);
+							xMax_ = -xMin(area);
+							yMin_ = yMin(area);
+							yMax_ = yMax(area);
+
+						}else if(alignment == BOTTOM|RIGHT){
+							// flip vertical
+							xMin = xMin(boundaries);
+							xMax = xMax(boundaries);
+							yMin = -yMax(boundaries);
+							yMax = -yMin(boundaries);
+							xMin_ = xMin(area);
+							xMax_ = xMax(area);
+							yMin_ = -yMax(area);
+							yMax_ = -yMin(area);
+
+						}else if(alignment == BOTTOM|LEFT){
+							// flip both horizontal and vertical
+							xMin = -xMax(boundaries);
+							xMax = -xMin(boundaries);
+							yMin = -yMax(boundaries);
+							yMax = -yMin(boundaries);
+							xMin_ = -xMax(area);
+							xMax_ = -xMin(area);
+							yMin_ = -yMax(area);
+							yMax_ = -yMin(area);
+						}
+
+						// move the object in the transposed direction
+						if(alignment == TOP|RIGHT){
+							// no transpose required
+						}else if(alignment == TOP|LEFT){
+							// flip horizontal
+						}else if(alignment == BOTTOM|RIGHT){
+							// flip vertical
+						}else if(alignment == BOTTOM|LEFT){
+							// flip both horizontal and vertical
+						}						
+
+						throw new Tools.MyException("Not yet supported");
+					}
+				}
 			}
 
 			function fitAreaWithRatio(area as Area, boundaries as Area, ratio as Float) as Void {
@@ -188,7 +380,7 @@ module MyModule{
 					}
 				}
 
-				var quadrantCount = MyMath.getBitsHigh(quadrants);
+				var quadrantCount = MyMath.countBitsHigh(quadrants);
 				if(quadrantCount > 1){
 					// No sollution yet......
 					// check if the circle edge can be reached with 2 corners
@@ -250,7 +442,7 @@ module MyModule{
 
 					// reduce quadrants (remove quadrants with smallest space within boundaries)
 					var quadrant = quadrants;
-					quadrantCount = MyMath.getBitsHigh(quadrant);
+					quadrantCount = MyMath.countBitsHigh(quadrant);
 					if(quadrantCount > 1){
 						var removed_quadrants = 0;
 						if(quadrants & QUADRANT_TOP_RIGHT > 0){
