@@ -53,7 +53,7 @@ module MyModule{
 			return [(-b - sqrtD)/(2 * a), (-b + sqrtD)/(2 * a)] as Array<Decimal>;
 		}
 
-		function getBitsHigh(value as Integer) as Number{
+		function countBitsHigh(value as Integer) as Number{
 			return getBitValues(value).size();
 		}
 		function getBitValues(value as Integer) as Array<Integer>{
