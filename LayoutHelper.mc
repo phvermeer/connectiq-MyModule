@@ -203,7 +203,7 @@ module MyModule{
 						var width_ = xMax_ - xMin_;
 						var height_ = yMax_ - yMin_;
 						if((xMaxCalc - xMinCalc) >= width_){
-							dx = ((xMinCalc + xMaxCalc) - (xMin_ + xMax_)) / 2;
+							dx = 0.5 * ((xMinCalc + xMaxCalc) - (xMin_ + xMax_));
 							dy = yMax - yMax_;
 						}else{
 							// move away from the border until the object fits
@@ -301,18 +301,77 @@ module MyModule{
 							yMax_ = -yMin(area);
 						}
 
+						// Now align with the top-right corner to the top-right corner of the boundaries or circle edge
+						// 1 - if the top right corner of the boundaries is not outside the cirle, this will be the point to align to (go further to 4)
+						// 2 - draw a diagonal line in the boundaries from bottom-left till top-right.
+						// 3 - the crossing with the circle is the position to align to.
+						// 4 - Now move the top-right corner of the object that has to be aligned to the refence point for alignment.
+						//
+						//         radius   ↑      ┏━━━┯━━━━━━┳╴╴.○
+						//	(from center)        ┏━┛   ┆     .○˙┐ ┆
+						//	                   ┏━┛     ┆  ·˙    └─┪
+						//	                   ┃       ○˙╴╴╴╴╴╴╴╴╴┃
+						//	                ─  ┃        +         ┃
+						//	                   ┃                  ┃
+						//	                   ┗━┓              ┏━┛
+						//	                     ┗━┓          ┏━┛
+						//	                       ┗━━━━━━━━━━┛
+
+						// is the top-right corner of the boundaries within the circle?
+						// radius² ≥ x² + y²
+
+						// step 1
+						var xMaxCalc = xMax;
+						var yMaxCalc = yMax;
+
+						if(xMax*xMax + yMax*yMax > r2){
+							// step 2
+							// get the point on the diagonal crossing with the circle
+							// 	y = rc * x + C  (calculate rc and C)
+							// 	=> rc = (xMax-xMin) / (yMax-yMin)
+							var rc = (xMax-xMin)/(yMax-xMin);
+							// 	y = xMin + (x - xMin) * rc
+							// 	=> C = xMin - xMin * rc
+							var C = xMin - xMin * rc;
+
+							// step 3
+							// Not get the crossing with the circle
+							// radius² = x² + y²
+							// radius² - x² = (rc * x + C)²
+							// radius² - x² = rc² * x² + 2 * rc * x + C²
+							// 0 = (rc²+1)*x² + 2*rc*x + C²-radius²
+							// use the abc formula to retrieve the x
+							var a = rc*rc + 1;
+							var b = 2*rc;
+							var c = C*C-r2;
+							var results = MyMath.getAbcFormulaResults(a, b, c);
+							xMaxCalc = results[1];
+							// use the rc * x + C to retrieve the y
+							yMaxCalc = rc * xMaxCalc + C;
+						}
+
+						// get the movement
+						dx = xMaxCalc - xMax_;
+						dy = xMaxCalc - yMax_;
+
 						// move the object in the transposed direction
 						if(alignment == TOP|RIGHT){
 							// no transpose required
+							area.locX += dx;
+							area.locY -= dy;
 						}else if(alignment == TOP|LEFT){
 							// flip horizontal
+							area.locX += -dx;
+							area.locY -= dy;
 						}else if(alignment == BOTTOM|RIGHT){
 							// flip vertical
+							area.locX += dx;
+							area.locY -= -dy;
 						}else if(alignment == BOTTOM|LEFT){
 							// flip both horizontal and vertical
+							area.locX += -dx;
+							area.locY -= -dy;
 						}						
-
-						throw new Tools.MyException("Not yet supported");
 					}
 				}
 			}
