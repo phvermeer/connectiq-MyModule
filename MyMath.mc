@@ -51,6 +51,20 @@ module MyModule{
 		function getAbcFormulaResults(a as Numeric, b as Numeric, c as Numeric) as Array<Decimal> {
 			var sqrtD = Math.sqrt(b*b - 4*a*c);
 			return [(-b - sqrtD)/(2 * a), (-b + sqrtD)/(2 * a)] as Array<Decimal>;
-		}	
+		}
+
+		function countBitsHigh(value as Integer) as Number{
+			return getBitValues(value).size();
+		}
+		function getBitValues(value as Integer) as Array<Integer>{
+			var bitValues = [] as Array<Integer>;
+			for(var mask=1; mask-1 <= value; mask*=2){
+				var bitValue = value & mask;
+				if(bitValue > 0){
+					bitValues.add(bitValue);
+				}
+			}
+			return bitValues;
+		}
 	}
 }
