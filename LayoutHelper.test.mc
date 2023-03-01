@@ -6,7 +6,7 @@ using MyModule.Layout;
 using MyModule.MyMath;
 
 (:test)
-function layoutHelper_getAreaByRatio(logger as Logger) as Boolean{
+function layoutHelper_fitAreaWithRatio(logger as Logger) as Boolean{
 	var deviceSettings = System.getDeviceSettings();
 	System.println(Lang.format("screenShape: $1$", [deviceSettings.screenShape]));
 	if(deviceSettings.screenShape == System.SCREEN_SHAPE_ROUND){
@@ -19,25 +19,25 @@ function layoutHelper_getAreaByRatio(logger as Logger) as Boolean{
 		var stepSize = diameter / 4;
 
 		for(var ratio = 0.5f; ratio <= 2.0; ratio += 0.25){
-//		if(ratio != 2.0f) { continue; }
+		// if(ratio != 2.0f) { continue; }
 			System.println("Ratio: "+ ratio);
 			for(var y=0; y < diameter; y+=stepSize){
-//				if(y != 0) { continue; }
+				// if(y != 0) { continue; }
 				for(var x=0; x < diameter; x+=stepSize){
-//					if(x != 0) { continue; }
+					// if(x != 0) { continue; }
 					for(var h=stepSize; y+h <= diameter; h+=stepSize){
-//						if(h != 195) { continue; }
+						// if(h != 195) { continue; }
 						for(var w=stepSize; x+w <= diameter; w+=stepSize){
-//							if(w != 130) { continue; }
+							// if(w != 130) { continue; }
 
 							// check valid
 							var errorMessages = [] as Array<String>;
-							var boundaries = new Layout.MyArea(x, y, w, h);
+							var boundaries = new Layout.Area(x, y, w, h);
 							var infoBoundaries = Lang.format("Boundaries: x,y,w,h = $1$,$2$,$3$,$4$", [boundaries.locX, boundaries.locY, boundaries.width, boundaries.height]);
 							var infoRatio = Lang.format("Requested Ratio: $1$", [ratio]);
 							var infoResult = "No result available";
 
-							var area = new Layout.MyArea(x, y, w, h);
+							var area = new Layout.Area(x, y, w, h);
 							helper.fitAreaWithRatio(area, boundaries, ratio);
 							infoResult = Lang.format("Result: x,y,w,h = $1$,$2$,$3$,$4$", [area.locX, area.locY, area.width, area.height]);
 

@@ -32,14 +32,14 @@ module MyModule{
 			QUADRANTS_ALL = 15
 		}
 
-		typedef Area as interface{
+		typedef IArea as interface{
 			var locX as Numeric;
 			var locY as Numeric;
 			var width as Numeric;
 			var height as Numeric;
 		};
 
-		class MyArea{
+		class Area{
 			var locX as Numeric;
 			var locY as Numeric;
 			var width as Numeric;
@@ -55,7 +55,7 @@ module MyModule{
 
 		class LayoutHelper{
 			// Simple helper not taking account of round edges
-			function fitAreaWithRatio(area as Area, boundaries as Area, ratio as Float) as Void{
+			function fitAreaWithRatio(area as IArea, boundaries as IArea, ratio as Float) as Void{
 				// returnes an area with given ratio (=width/height) within given boundaries
 				var w = boundaries.width;
 				var h = boundaries.height;
@@ -83,7 +83,7 @@ module MyModule{
 				}
 			}
 
-			function setAreaAligned(area as Area, boundaries as Area, alignment as Direction|Number) as Void{
+			function setAreaAligned(area as IArea, boundaries as IArea, alignment as Direction|Number) as Void{
 				var left = (alignment & LEFT) > 0;
 				var right = (alignment & RIGHT) > 0;
 				var top = (alignment & TOP) > 0;
@@ -105,7 +105,7 @@ module MyModule{
 				area.locY += dy;
 			}
 
-			function copyArea(source as Area, destination as Area) as Void{
+			function copyArea(source as IArea, destination as IArea) as Void{
 				destination.locX = source.locX;
 				destination.locY = source.locY;
 				destination.width = source.width;
@@ -121,7 +121,7 @@ module MyModule{
 				LayoutHelper.initialize();
 			}
 
-			function setAreaAligned(area as Area, boundaries as Area, alignment as Direction|Number) as Void{
+			function setAreaAligned(area as IArea, boundaries as IArea, alignment as Direction|Number) as Void{
 				if(boundaries.width > area.width && boundaries.height > area.height){
 					// common values
 					var r2 = radius*radius;
@@ -376,7 +376,7 @@ module MyModule{
 				}
 			}
 
-			function fitAreaWithRatio(area as Area, boundaries as Area, ratio as Float) as Void {
+			function fitAreaWithRatio(area as IArea, boundaries as IArea, ratio as Float) as Void {
 				var xMin = xMin(boundaries);
 				var xMax = xMax(boundaries);
 				var yMin = yMin(boundaries);
@@ -558,7 +558,7 @@ module MyModule{
 				}
 			}
 
-			private function checkBoundaries(area as Area, boundaries as Area) as Quadrant|Number{
+			private function checkBoundaries(area as IArea, boundaries as IArea) as Quadrant|Number{
 				// this number results with the quadrants in which the limits are exceeded
 				var quadrants_exceeded = 0;
 
@@ -591,7 +591,7 @@ module MyModule{
 				return quadrants_exceeded;
 			}
 
-			private function reachCircleEdge_4Points(area as Area, ratio as Float) as Void{
+			private function reachCircleEdge_4Points(area as IArea, ratio as Float) as Void{
 				// this functions returns 2 Float values: xMax, yMax which indicate the top left corner of the found rectangle with given ratio
 				//         radius   ↑      ┌─────────┐
 				//	(from center)   ·    ┌─○· · · · ·○─┐   ↑ yMax (from vertical center)
@@ -627,7 +627,7 @@ module MyModule{
 				setYmax(area, yMax);
 			}
 
-			private function reachCircleEdge_2Points(area as Area, boundaries as Area, ratio as Float, direction as Direction|Number) as Void{
+			private function reachCircleEdge_2Points(area as IArea, boundaries as IArea, ratio as Float, direction as Direction|Number) as Void{
 				// determine the direction
 				var offset = 0;
 				var xMin = xMin(boundaries);
@@ -718,7 +718,7 @@ module MyModule{
 				}
 			}
 
-			private function reachCircleEdge_1Point(area as Area, boundaries as Area, ratio as Float, quadrant as Quadrant|Number) as Void{
+			private function reachCircleEdge_1Point(area as IArea, boundaries as IArea, ratio as Float, quadrant as Quadrant|Number) as Void{
 				// This function calculates the xy coordinates where the circle edge in given quadrant is reached from a point within the circle and with a given ratio (slope)
 				var xOffset = 0;
 				var yOffset = 0;
@@ -803,7 +803,7 @@ module MyModule{
 				}
 			}
 
-			private function shrinkAndResize(area as Area, boundaries as Area, quadrants as Quadrant|Number) as Void{
+			private function shrinkAndResize(area as IArea, boundaries as IArea, quadrants as Quadrant|Number) as Void{
 				var xMin = xMin(boundaries);
 				var xMax = xMax(boundaries);
 				var yMin = yMin(boundaries);
@@ -862,30 +862,30 @@ module MyModule{
 			//        │
 			//        0 →
 						
-			function xMin(area as Area) as Numeric{ return area.locX - radius; }
-			function xMax(area as Area) as Numeric{ return area.locX + area.width - radius; }
-			function yMin(area as Area) as Numeric{ return radius - (area.locY + area.height); }
-			function yMax(area as Area) as Numeric{ return radius - area.locY; }
+			function xMin(area as IArea) as Numeric{ return area.locX - radius; }
+			function xMax(area as IArea) as Numeric{ return area.locX + area.width - radius; }
+			function yMin(area as IArea) as Numeric{ return radius - (area.locY + area.height); }
+			function yMax(area as IArea) as Numeric{ return radius - area.locY; }
 
-			private function setXmin(area as Area, xMin as Numeric) as Void{
+			private function setXmin(area as IArea, xMin as Numeric) as Void{
 				var dx = xMin - xMin(area);
 				area.locX += dx;
 				area.width -= dx;
 			}
-			private function setXmax(area as Area, xMax as Numeric) as Void{
+			private function setXmax(area as IArea, xMax as Numeric) as Void{
 				var dx = xMax - xMax(area);
 				area.width += dx;
 			}
-			private function setYmin(area as Area, yMin as Numeric) as Void{
+			private function setYmin(area as IArea, yMin as Numeric) as Void{
 				var dy = yMin - yMin(area);
 				area.height -= dy;
 			}
-			private function setYmax(area as Area, yMax as Numeric) as Void{
+			private function setYmax(area as IArea, yMax as Numeric) as Void{
 				var dy = yMax - yMax(area);
 				area.locY -= dy;
 				area.height += dy;
 			}
-			function roundArea(area as Area) as Void{
+			function roundArea(area as IArea) as Void{
 				var xMin = Math.round(xMin(area)).toNumber();
 				var xMax = Math.round(xMax(area)).toNumber();
 				var yMin = Math.round(yMin(area)).toNumber();
